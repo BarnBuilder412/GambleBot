@@ -2,14 +2,17 @@
 import { Context, Markup } from "telegraf";
 import { UserService } from "../services/UserService";
 import { GameManager } from "../services/GameManager";
+import { MultiplayerService } from "../services/MultiplayerService";
 
 export class MenuHandler {
   private userService: UserService;
   private gameManager: GameManager;
+  private multiplayer: MultiplayerService;
 
   constructor(userService: UserService, gameManager: GameManager) {
     this.userService = userService;
     this.gameManager = gameManager;
+    this.multiplayer = new MultiplayerService(userService);
   }
 
   async handleStart(ctx: Context): Promise<void> {
@@ -200,29 +203,38 @@ Good luck! 🍀`;
     const wager = parseFloat(wagerAmount);
     ctx.session.game = gameName;
     ctx.session.wager = wager;
-
-    await ctx.reply(`✅ Wager set: ${wager} ETH for ${gameName}\n\nStarting game...`);
-
-    // Trigger the game based on type
-    const gameHandler = new (await import('./GameHandler')).GameHandler(this.gameManager);
     
+    await ctx.reply(
+      `✅ Wager set: ${wager} ETH for ${gameName}\n\nChoose how to play:`,
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback('🤖 Play vs Bot', `pve_${gameName}`),
+          Markup.button.callback('🧑‍🤝‍🧑 Create Challenge', `pvp_create_${gameName}`)
+        ],
+        [Markup.button.callback('📝 View Open Challenges', `pvp_list_${gameName}`)],
+        [Markup.button.callback('🔙 Back', 'play')]
+      ])
+    );
+  }
+
+  async handlePlayVsBot(ctx: Context, gameName: string): Promise<void> {
+    await ctx.answerCbQuery();
+    const wager = ctx.session.wager;
+    if (!wager) {
+      await ctx.reply("Please pick a wager first.");
+      return;
+    }
     switch (gameName) {
-      case 'Dice':
-        // Auto-play dice game
+      case 'Dice': {
         const diceMessage = await ctx.replyWithDice({ emoji: '🎲' });
         const diceValue = diceMessage.dice?.value || 1;
-        console.log('Dice rolled:', diceValue);
-        
         setTimeout(async () => {
           const diceResult = await this.gameManager.playDice(ctx, diceValue);
           if (diceResult.success) {
             await ctx.reply(
               diceResult.message,
               Markup.inlineKeyboard([
-                [
-                  Markup.button.callback('🎲 Play Dice Again', 'play_again_Dice'),
-                  Markup.button.callback('🎮 Other Games', 'play')
-                ],
+                [Markup.button.callback('🎲 Play Dice Again', 'play_again_Dice'), Markup.button.callback('🎮 Other Games', 'play')],
                 [Markup.button.callback('🏠 Main Menu', 'main_menu')]
               ])
             );
@@ -232,40 +244,28 @@ Good luck! 🍀`;
           this.gameManager.clearSession(ctx);
         }, 4000);
         break;
-
-      case 'Coinflip':
-        // Show heads/tails buttons
+      }
+      case 'Coinflip': {
         ctx.session.awaitingGuess = true;
         await ctx.reply(
           '🪙 **Coinflip Game Ready!**\n\nChoose your side:',
           {
             parse_mode: "Markdown",
-            ...Markup.inlineKeyboard([
-              [
-                Markup.button.callback('🪙 Heads', 'coinflip_heads'),
-                Markup.button.callback('🪙 Tails', 'coinflip_tails')
-              ]
-            ])
+            ...Markup.inlineKeyboard([[Markup.button.callback('🪙 Heads', 'coinflip_heads'), Markup.button.callback('🪙 Tails', 'coinflip_tails')]])
           }
         );
         break;
-
-      case 'Bowling':
-        // Auto-play bowling game
+      }
+      case 'Bowling': {
         const bowlingMessage = await ctx.replyWithDice({ emoji: '🎳' });
         const bowlingValue = bowlingMessage.dice?.value || 1;
-        console.log('Bowling rolled:', bowlingValue);
-        
         setTimeout(async () => {
           const bowlingResult = await this.gameManager.playBowling(ctx, bowlingValue);
           if (bowlingResult.success) {
             await ctx.reply(
               bowlingResult.message,
               Markup.inlineKeyboard([
-                [
-                  Markup.button.callback('🎳 Play Bowling Again', 'play_again_Bowling'),
-                  Markup.button.callback('🎮 Other Games', 'play')
-                ],
+                [Markup.button.callback('🎳 Play Bowling Again', 'play_again_Bowling'), Markup.button.callback('🎮 Other Games', 'play')],
                 [Markup.button.callback('🏠 Main Menu', 'main_menu')]
               ])
             );
@@ -275,7 +275,45 @@ Good luck! 🍀`;
           this.gameManager.clearSession(ctx);
         }, 4000);
         break;
+      }
     }
+  }
+
+  async handleCreateChallenge(ctx: Context, gameName: string): Promise<void> {
+    await ctx.answerCbQuery();
+    const wager = ctx.session.wager;
+    if (!wager) {
+      await ctx.reply("Please pick a wager first.");
+      return;
+    }
+    const challenge = await this.multiplayer.createChallenge(ctx, gameName, wager);
+    await ctx.reply(
+      `📣 Challenge created for ${gameName} at ${wager} ETH!\nChallenge #${challenge.id}. Waiting for an opponent...`,
+      Markup.inlineKeyboard([
+        [Markup.button.callback('🗒 View Open Challenges', `pvp_list_${gameName}`)],
+        [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+      ])
+    );
+  }
+
+  async handleListChallenges(ctx: Context, gameName: string): Promise<void> {
+    await ctx.answerCbQuery();
+    const open = await this.multiplayer.listOpenChallenges(gameName);
+    if (open.length === 0) {
+      await ctx.reply(`No open challenges for ${gameName} yet. Create one!`);
+      return;
+    }
+    const rows = open.slice(0, 10).map((c) => [
+      Markup.button.callback(
+        `#${c.id} by @${c.creator.username || c.creator.telegramId} • ${c.wager} ETH`,
+        `pvp_accept_${c.id}`
+      )
+    ]);
+    rows.push([Markup.button.callback('🔙 Back', 'play')]);
+    await ctx.reply(
+      `Open challenges for ${gameName}:`,
+      Markup.inlineKeyboard(rows)
+    );
   }
 
 

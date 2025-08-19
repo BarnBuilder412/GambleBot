@@ -3,6 +3,7 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { User } from "../entities/User";
 import { Transaction } from "../entities/Transaction";
+import { Challenge } from "../entities/Challenge";
 import * as dotenv from "dotenv";
 dotenv.config();
 
@@ -11,6 +12,6 @@ export const AppDataSource = new DataSource({
   url: process.env.DATABASE_URL,
   synchronize: true, // For prod, use migrations instead
   logging: false,
-  entities: [User, Transaction],
+  entities: [User, Transaction, Challenge],
   ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
 });
