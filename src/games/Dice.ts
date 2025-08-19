@@ -18,14 +18,14 @@ export class Dice extends BaseGame {
     const roll = diceValue || Math.floor(Math.random() * 6) + 1;
     
     let winAmount = 0;
-    let message = `🎲 The dice rolled: ${roll}\n`;
+    let message = "";
 
     // New rule: Win if dice shows 4, 5, or 6
     if (roll >= 4) {
       winAmount = wager * 2; // 2x payout (50% chance)
-      message += `🎉 You won! Dice shows ${roll} (4-6 wins). You earn ${winAmount.toFixed(4)} ETH!`;
+      message = `Win\nPayout: $${winAmount.toFixed(2)}`;
     } else {
-      message += `😢 You lost! Dice shows ${roll} (1-3 loses). Better luck next time!`;
+      message = `Lose\nPayout: $0`;
     }
 
     return { message, winAmount };

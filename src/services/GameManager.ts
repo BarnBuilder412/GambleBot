@@ -38,7 +38,7 @@ export class GameManager {
   async processWager(ctx: Context, gameName: string, wagerText: string): Promise<{ success: boolean; message?: string }> {
     const wager = parseFloat(wagerText);
     if (isNaN(wager) || wager <= 0) {
-      return { success: false, message: 'Please enter a valid wager amount (ETH).' };
+      return { success: false, message: 'Please enter a valid wager amount ($).' };
     }
 
     const user = await this.userService.getOrCreateUser(ctx);

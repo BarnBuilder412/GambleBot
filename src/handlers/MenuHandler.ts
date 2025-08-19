@@ -16,7 +16,7 @@ export class MenuHandler {
     const user = await this.userService.getOrCreateUser(ctx);
 
     await ctx.reply(
-      `Welcome, ${ctx.from?.first_name}!\nBalance: ${user.balance.toFixed(4)} ETH`,
+      `Welcome, ${ctx.from?.first_name}!\nBalance: ${user.balance.toFixed(4)} $`,
       Markup.inlineKeyboard([
         [Markup.button.callback("🎲 Play", "play")],
         [Markup.button.callback("💰 Deposit Address", "deposit")],
@@ -51,18 +51,22 @@ export class MenuHandler {
     // Show wager options and game rules
     const wagerButtons = [
       [
-        Markup.button.callback("💰 0.001 ETH", `wager_${gameName}_0.001`),
-        Markup.button.callback("💰 0.005 ETH", `wager_${gameName}_0.005`),
-        Markup.button.callback("💰 0.01 ETH", `wager_${gameName}_0.01`)
+        Markup.button.callback("$0.10", `wager_${gameName}_0.1`),
+        Markup.button.callback("$0.50", `wager_${gameName}_0.5`),
+        Markup.button.callback("$1", `wager_${gameName}_1`)
       ],
       [
-        Markup.button.callback("💰 0.05 ETH", `wager_${gameName}_0.05`),
-        Markup.button.callback("💰 0.1 ETH", `wager_${gameName}_0.1`),
-        Markup.button.callback("💰 0.5 ETH", `wager_${gameName}_0.5`)
+        Markup.button.callback("$5", `wager_${gameName}_5`),
+        Markup.button.callback("$10", `wager_${gameName}_10`),
+        Markup.button.callback("$25", `wager_${gameName}_25`)
       ],
       [
-        Markup.button.callback("💰 1 ETH", `wager_${gameName}_1`),
-        Markup.button.callback("💰 5 ETH", `wager_${gameName}_5`)
+        Markup.button.callback("$50", `wager_${gameName}_50`),
+        Markup.button.callback("$100", `wager_${gameName}_100`)
+      ],
+      [
+        Markup.button.callback("Half Balance", `wager_${gameName}_half`),
+        Markup.button.callback("Full Balance", `wager_${gameName}_full`)
       ]
     ];
 
@@ -94,7 +98,7 @@ export class MenuHandler {
     const user = await this.userService.getOrCreateUser(ctx);
     
     await ctx.reply(
-      `Settings:\nUsername: ${user.username}\nBalance: ${user.balance.toFixed(4)} ETH\nDeposit Address: \`${user.depositAddress}\``,
+      `Settings:\nUsername: ${user.username}\nBalance: ${user.balance.toFixed(4)} $\nDeposit Address: \`${user.depositAddress}\``,
       { parse_mode: "MarkdownV2" }
     );
   }
@@ -118,8 +122,8 @@ export class MenuHandler {
 • 50% chance to win
 
 🎮 **Example:**
-• Wager: 0.1 ETH
-• Dice rolls 5 → You win 0.2 ETH!
+• Wager: $50
+• Dice rolls 5 → You win $100!
 • Dice rolls 2 → You lose your wager
 
 Good luck! 🍀`;
@@ -148,9 +152,9 @@ Good luck! 🍀`;
 • Poor Roll = Loss
 
 🎮 **Example:**
-• Wager: 0.1 ETH
-• Roll Strike (10 pins) → You win 0.3 ETH!
-• Roll 8 pins → You win 0.15 ETH!
+• Wager: $50
+• Roll Strike (10 pins) → You win $150!
+• Roll 8 pins → You win $75!
 • Roll 4 pins → You lose your wager
 
 🎳 **Pin Mapping:**
@@ -185,8 +189,8 @@ Good luck! 🍀`;
 • 50% chance to win
 
 🎮 **Example:**
-• Wager: 0.1 ETH
-• Choose Heads → Coin shows Heads → You win 0.2 ETH!
+• Wager: $50
+• Choose Heads → Coin shows Heads → You win $100!
 • Choose Tails → Coin shows Heads → You lose your wager
 
 Good luck! 🍀`;
@@ -197,11 +201,34 @@ Good luck! 🍀`;
   async handleWagerSelection(ctx: Context, gameName: string, wagerAmount: string): Promise<void> {
     await ctx.answerCbQuery();
     
-    const wager = parseFloat(wagerAmount);
+    let wager: number;
+    
+    // Handle balance-based wagering
+    if (wagerAmount === 'half' || wagerAmount === 'full') {
+      const user = await this.userService.getOrCreateUser(ctx);
+      
+      if (wagerAmount === 'half') {
+        wager = user.balance / 2;
+      } else { // full
+        wager = user.balance;
+      }
+      
+      // Check if user has sufficient balance
+      if (wager <= 0) {
+        await ctx.reply(
+          "❌ **Insufficient Balance**\n\nYou don't have enough funds to place this wager.\n\nPlease make a deposit first!",
+          { parse_mode: "Markdown" }
+        );
+        return;
+      }
+    } else {
+      wager = parseFloat(wagerAmount);
+    }
+    
     ctx.session.game = gameName;
     ctx.session.wager = wager;
 
-    await ctx.reply(`✅ Wager set: ${wager} ETH for ${gameName}\n\nStarting game...`);
+    await ctx.reply(`✅ Wager set: $${wager.toFixed(2)} for ${gameName}\n\nStarting game...`);
 
     // Trigger the game based on type
     const gameHandler = new (await import('./GameHandler')).GameHandler(this.gameManager);
@@ -216,8 +243,9 @@ Good luck! 🍀`;
         setTimeout(async () => {
           const diceResult = await this.gameManager.playDice(ctx, diceValue);
           if (diceResult.success) {
+            const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'Player';
             await ctx.reply(
-              diceResult.message,
+              `${username} ${diceResult.message}`,
               Markup.inlineKeyboard([
                 [
                   Markup.button.callback('🎲 Play Dice Again', 'play_again_Dice'),
@@ -259,8 +287,9 @@ Good luck! 🍀`;
         setTimeout(async () => {
           const bowlingResult = await this.gameManager.playBowling(ctx, bowlingValue);
           if (bowlingResult.success) {
+            const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'Player';
             await ctx.reply(
-              bowlingResult.message,
+              `${username} ${bowlingResult.message}`,
               Markup.inlineKeyboard([
                 [
                   Markup.button.callback('🎳 Play Bowling Again', 'play_again_Bowling'),

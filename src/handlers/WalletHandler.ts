@@ -39,7 +39,7 @@ export class WalletHandler {
     // Check if user has any balance to withdraw
     if (user.balance <= 0) {
       await ctx.reply(
-        "❌ **Insufficient Balance**\n\nYou don't have any ETH to withdraw.\nCurrent balance: 0.0000 ETH",
+        "❌ **Insufficient Balance**\n\nYou don't have any funds to withdraw.\nCurrent balance: $0.00",
         { parse_mode: "Markdown" }
       );
       return;
@@ -49,7 +49,7 @@ export class WalletHandler {
     ctx.session.withdrawStep = 'address';
 
     await ctx.reply(
-      `💰 **Withdraw ETH**\n\nCurrent balance: ${user.balance.toFixed(4)} ETH\n\n🔐 Please enter your Ethereum wallet address:\n\nExample: 0x742d35Cc6634C0532925a3b8D4C2E8e4C7...`,
+      `💰 **Withdraw Funds**\n\nCurrent balance: $${user.balance.toFixed(2)}\n\n🔐 Please enter your Ethereum wallet address:\n\nExample: 0x742d35Cc6634C0532925a3b8D4C2E8e4C7...`,
       {
         parse_mode: "Markdown",
         ...Markup.inlineKeyboard([
@@ -81,7 +81,7 @@ export class WalletHandler {
     const user = await this.userService.getOrCreateUser(ctx);
 
     await ctx.reply(
-      `✅ **Valid Address Confirmed**\n\n📍 Withdrawal address:\n${address}\n\n💰 Available balance: ${user.balance.toFixed(4)} ETH\n\n💸 Enter withdrawal amount (ETH):`,
+      `✅ **Valid Address Confirmed**\n\n📍 Withdrawal address:\n${address}\n\n💰 Available balance: $${user.balance.toFixed(2)}\n\n💸 Enter withdrawal amount ($):`,
       {
         parse_mode: "Markdown",
         ...Markup.inlineKeyboard([
@@ -104,7 +104,7 @@ export class WalletHandler {
     // Validate amount
     if (isNaN(amount) || amount <= 0) {
       await ctx.reply(
-        "❌ **Invalid Amount**\n\nPlease enter a valid withdrawal amount.\n\nExample: 0.05",
+        "❌ **Invalid Amount**\n\nPlease enter a valid withdrawal amount.\n\nExample: 25",
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
@@ -122,7 +122,7 @@ export class WalletHandler {
     // Check if user has sufficient balance
     if (amount > user.balance) {
       await ctx.reply(
-        `❌ **Insufficient Balance**\n\nRequested: ${amount.toFixed(4)} ETH\nAvailable: ${user.balance.toFixed(4)} ETH\n\nPlease enter a smaller amount.`,
+        `❌ **Insufficient Balance**\n\nRequested: $${amount.toFixed(2)}\nAvailable: $${user.balance.toFixed(2)}\n\nPlease enter a smaller amount.`,
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
@@ -186,7 +186,7 @@ export class WalletHandler {
       ctx.session.withdrawAddress = undefined;
 
       await ctx.reply(
-        `✅ **Withdrawal Processed**\n\n💰 Amount: ${amount.toFixed(4)} ETH\n📍 To address: ${address}\n\n💳 New balance: ${(user.balance - amount).toFixed(4)} ETH\n\n⏳ Your withdrawal will be processed within 24 hours.`,
+        `✅ **Withdrawal Processed**\n\n💰 Amount: $${amount.toFixed(2)}\n📍 To address: ${address}\n\n💳 New balance: $${(user.balance - amount).toFixed(2)}\n\n⏳ Your withdrawal will be processed within 24 hours.`,
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([

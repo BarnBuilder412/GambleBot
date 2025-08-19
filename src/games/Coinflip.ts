@@ -23,17 +23,16 @@ export class Coinflip extends BaseGame {
 
     const result = Math.random() < 0.5 ? "heads" : "tails";
     
-    let message = `🪙 **COINFLIP RESULT** 🪙\n\n`;
-    message += `${result === "heads" ? "👑" : "⚡"} The coin landed on: **${result.toUpperCase()}**\n`;
-    message += `🎯 Your guess: **${guess.toUpperCase()}**\n\n`;
+    let message = "";
+    let winAmount = 0;
     
     if (guess === result) {
-      const winAmount = wager * 2;
-      message += `🎉 **CORRECT!** You guessed right!\n💰 You win ${winAmount.toFixed(4)} ETH! (2x payout)`;
-      return { message, winAmount };
+      winAmount = wager * 2;
+      message = `Win\nPayout: $${winAmount.toFixed(2)}`;
     } else {
-      message += `😢 **WRONG!** Better luck next time!\n💸 You lost your wager.`;
-      return { message, winAmount: 0 };
+      message = `Lose\nPayout: $0`;
     }
+
+    return { message, winAmount };
   }
 }

@@ -24,22 +24,20 @@ export class Bowling extends BaseGame {
     console.log(`Bowling: Telegram dice=${telegramDiceValue}, Mapped pins=${actualPins}`);
     
     let winAmount = 0;
-    let message = `🎳 **BOWLING RESULT** 🎳\n\n`;
-    message += this.getBowlingVisual(actualPins) + '\n\n';
-    message += `📊 Pins knocked down: ${actualPins}/10\n`;
+    let message = "";
 
     // Apply new betting rules
     if (actualPins === 10) {
       // Strike (10 pins) → payout x3
       winAmount = wager * 3;
-      message += `🏆 **STRIKE!** All pins down!\n🎉 You win ${winAmount.toFixed(4)} ETH! (3x payout)`;
+      message = `Win\nPayout: $${winAmount.toFixed(2)}`;
     } else if (actualPins >= 7 && actualPins <= 9) {
       // 7-9 pins → payout x1.5
       winAmount = wager * 1.5;
-      message += `🔥 **Great roll!** ${actualPins} pins down!\n💰 You win ${winAmount.toFixed(4)} ETH! (1.5x payout)`;
+      message = `Win\nPayout: $${winAmount.toFixed(2)}`;
     } else {
       // 0-6 pins → loss
-      message += `😢 Only ${actualPins} pins down. You lost your wager.\n💪 Better luck next time!`;
+      message = `Lose\nPayout: $0`;
     }
 
     return { message, winAmount };

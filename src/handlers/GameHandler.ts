@@ -31,8 +31,9 @@ export class GameHandler {
             // Play the game with the actual dice value
             const diceResult = await this.gameManager.playDice(ctx, diceValue);
             if (diceResult.success) {
+              const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'Player';
               await ctx.reply(
-                diceResult.message,
+                `${username} ${diceResult.message}`,
                 Markup.inlineKeyboard([
                   [
                     Markup.button.callback('🎲 Play Dice Again', 'play_again_Dice'),
@@ -71,8 +72,9 @@ export class GameHandler {
             // Play the game with the actual bowling value
             const bowlingResult = await this.gameManager.playBowling(ctx, bowlingValue);
             if (bowlingResult.success) {
+              const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'Player';
               await ctx.reply(
-                bowlingResult.message,
+                `${username} ${bowlingResult.message}`,
                 Markup.inlineKeyboard([
                   [
                     Markup.button.callback('🎳 Play Bowling Again', 'play_again_Bowling'),
@@ -138,8 +140,9 @@ export class GameHandler {
       return;
     }
 
+    const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'Player';
     await ctx.reply(
-      result.message,
+      `${username} ${result.message}`,
       Markup.inlineKeyboard([
         [
           Markup.button.callback('🪙 Play Coinflip Again', 'play_again_Coinflip'),
