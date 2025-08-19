@@ -114,6 +114,173 @@ bot.action(/wager_(.+)_(.+)/, async (ctx) => {
   }
 });
 
+// PvE or PvP choices after wager
+bot.action(/pve_(.+)/, async (ctx) => {
+  const gameName = ctx.match?.[1];
+  if (gameName) {
+    await menuHandler.handlePlayVsBot(ctx, gameName);
+  }
+});
+
+bot.action(/pvp_create_(.+)/, async (ctx) => {
+  const gameName = ctx.match?.[1];
+  if (gameName) {
+    await menuHandler.handleCreateChallenge(ctx, gameName);
+  }
+});
+
+bot.action(/pvp_list_(.+)/, async (ctx) => {
+  const gameName = ctx.match?.[1];
+  if (gameName) {
+    await menuHandler.handleListChallenges(ctx, gameName);
+  }
+});
+
+bot.action(/pvp_accept_(\d+)/, async (ctx) => {
+  const challengeId = parseInt(ctx.match?.[1] || '0', 10);
+  if (!Number.isNaN(challengeId)) {
+    // Lazy import to avoid cycles
+    const { MultiplayerService } = await import('./services/MultiplayerService');
+    const { UserService } = await import('./services/UserService');
+    const mp = new MultiplayerService(new UserService());
+    const res = await mp.acceptChallenge(ctx, challengeId);
+    await ctx.answerCbQuery();
+    await ctx.reply(res.message);
+    if (res.ok) {
+      // Start the PvP game flow with both players' actions visible
+      const { AppDataSource } = await import('./utils/db');
+      const { Challenge } = await import('./entities/Challenge');
+      const repo = AppDataSource.getRepository(Challenge);
+      const ch = await repo.findOne({ where: { id: challengeId }, relations: ['creator', 'opponent'] });
+      if (!ch || !ch.opponent) return;
+
+      const creatorUser = ch.creator;
+      const opponentUser = ch.opponent!;
+      const creatorId = creatorUser.telegramId;
+      const opponentId = opponentUser.telegramId;
+      const display = (u: { username?: string | null; telegramId: number }) =>
+        u.username ? `@${u.username}` : `${u.telegramId}`;
+
+      if (ch.game === 'Dice') {
+        // Inform both players
+        await ctx.telegram.sendMessage(creatorId, `🎲 PvP Dice vs ${display(opponentUser)}! Rolling dice for both players...`);
+        await ctx.telegram.sendMessage(opponentId, `🎲 PvP Dice vs ${display(creatorUser)}! Rolling dice for both players...`);
+
+        // Roll for both players so each sees their own animation
+        const creatorRollMsg = await ctx.telegram.sendDice(creatorId, { emoji: '🎲' });
+        const opponentRollMsg = await ctx.telegram.sendDice(opponentId, { emoji: '🎲' });
+        const creatorRoll = creatorRollMsg.dice?.value || 1;
+        const opponentRoll = opponentRollMsg.dice?.value || 1;
+
+        // Wait for animation
+        setTimeout(async () => {
+          if (creatorRoll === opponentRoll) {
+            // Tie -> reroll up to 5 times; if still tied declare draw
+            let tries = 0;
+            let cVal = creatorRoll;
+            let oVal = opponentRoll;
+            while (tries < 5 && cVal === oVal) {
+              const tieNote = `🤝 Tie (${cVal} vs ${oVal})! Rerolling...`;
+              await ctx.telegram.sendMessage(creatorId, tieNote);
+              await ctx.telegram.sendMessage(opponentId, tieNote);
+              const cMsg = await ctx.telegram.sendDice(creatorId, { emoji: '🎲' });
+              const oMsg = await ctx.telegram.sendDice(opponentId, { emoji: '🎲' });
+              cVal = cMsg.dice?.value || 1;
+              oVal = oMsg.dice?.value || 1;
+              tries++;
+            }
+            setTimeout(async () => {
+              if (cVal === oVal) {
+                const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
+                await ctx.telegram.sendMessage(creatorId, drawMsg);
+                await ctx.telegram.sendMessage(opponentId, drawMsg);
+                await mp.completeDraw(ch.id);
+              } else {
+                const winnerId = cVal > oVal ? creatorId : opponentId;
+                const summary = `Result: ${display(creatorUser)} rolled ${cVal} • ${display(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerId === creatorId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+                await ctx.telegram.sendMessage(creatorId, summary);
+                await ctx.telegram.sendMessage(opponentId, summary);
+                await mp.settlePvpGame(ctx, ch.id, winnerId);
+              }
+            }, 4000);
+          } else {
+            const winnerId = creatorRoll > opponentRoll ? creatorId : opponentRoll > creatorRoll ? opponentId : Math.random() < 0.5 ? creatorId : opponentId;
+            const summary = `Result: ${display(creatorUser)} rolled ${creatorRoll} • ${display(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerId === creatorId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+            await ctx.telegram.sendMessage(creatorId, summary);
+            await ctx.telegram.sendMessage(opponentId, summary);
+            await mp.settlePvpGame(ctx, ch.id, winnerId);
+          }
+        }, 4000);
+      } else if (ch.game === 'Bowling') {
+        await ctx.telegram.sendMessage(creatorId, `🎳 PvP Bowling vs ${display(opponentUser)}! Rolling for both players...`);
+        await ctx.telegram.sendMessage(opponentId, `🎳 PvP Bowling vs ${display(creatorUser)}! Rolling for both players...`);
+
+        const creatorRollMsg = await ctx.telegram.sendDice(creatorId, { emoji: '🎳' });
+        const opponentRollMsg = await ctx.telegram.sendDice(opponentId, { emoji: '🎳' });
+        const creatorTelegramVal = creatorRollMsg.dice?.value || 1;
+        const opponentTelegramVal = opponentRollMsg.dice?.value || 1;
+
+        const mapPins = (v: number) => ({ 1:0, 2:3, 3:5, 4:7, 5:9, 6:10 } as Record<number, number>)[v] || 0;
+        const creatorPins = mapPins(creatorTelegramVal);
+        const opponentPins = mapPins(opponentTelegramVal);
+
+        setTimeout(async () => {
+          if (creatorPins === opponentPins) {
+            // Tie -> reroll up to 5 times; if still tied declare draw
+            let tries = 0;
+            let cPins = creatorPins;
+            let oPins = opponentPins;
+            while (tries < 5 && cPins === oPins) {
+              const tieNote = `🤝 Tie (${cPins} vs ${oPins})! Rerolling...`;
+              await ctx.telegram.sendMessage(creatorId, tieNote);
+              await ctx.telegram.sendMessage(opponentId, tieNote);
+              const cMsg2 = await ctx.telegram.sendDice(creatorId, { emoji: '🎳' });
+              const oMsg2 = await ctx.telegram.sendDice(opponentId, { emoji: '🎳' });
+              cPins = mapPins(cMsg2.dice?.value || 1);
+              oPins = mapPins(oMsg2.dice?.value || 1);
+              tries++;
+            }
+            setTimeout(async () => {
+              if (cPins === oPins) {
+                const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
+                await ctx.telegram.sendMessage(creatorId, drawMsg);
+                await ctx.telegram.sendMessage(opponentId, drawMsg);
+                await mp.completeDraw(ch.id);
+              } else {
+                const winnerId = cPins > oPins ? creatorId : opponentId;
+                const summary = `Result: ${display(creatorUser)} knocked ${cPins}/10 • ${display(opponentUser)} knocked ${oPins}/10\n🏆 Winner: ${winnerId === creatorId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+                await ctx.telegram.sendMessage(creatorId, summary, { parse_mode: 'Markdown' });
+                await ctx.telegram.sendMessage(opponentId, summary, { parse_mode: 'Markdown' });
+                await mp.settlePvpGame(ctx, ch.id, winnerId);
+              }
+            }, 4000);
+          } else {
+            const winnerId = creatorPins > opponentPins ? creatorId : opponentPins > creatorPins ? opponentId : Math.random() < 0.5 ? creatorId : opponentId;
+            const summary = `Result: ${display(creatorUser)} knocked ${creatorPins}/10 • ${display(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerId === creatorId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+            await ctx.telegram.sendMessage(creatorId, summary, { parse_mode: 'Markdown' });
+            await ctx.telegram.sendMessage(opponentId, summary, { parse_mode: 'Markdown' });
+            await mp.settlePvpGame(ctx, ch.id, winnerId);
+          }
+        }, 4000);
+      } else if (ch.game === 'Coinflip') {
+        const creatorSide = 'heads';
+        const opponentSide = 'tails';
+        const intro = `🪙 PvP Coinflip! ${display(creatorUser)} = HEADS, ${display(opponentUser)} = TAILS. Flipping...`;
+        await ctx.telegram.sendMessage(creatorId, intro);
+        await ctx.telegram.sendMessage(opponentId, intro);
+        // Animate simple flip
+        const resultIsHeads = Math.random() < 0.5;
+        const resultText = resultIsHeads ? 'HEADS' : 'TAILS';
+        const winnerId = resultIsHeads ? creatorId : opponentId;
+        const summary = `Result: ${resultText}\n🏆 Winner: ${winnerId === creatorId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+        await ctx.telegram.sendMessage(creatorId, summary, { parse_mode: 'Markdown' });
+        await ctx.telegram.sendMessage(opponentId, summary, { parse_mode: 'Markdown' });
+        await mp.settlePvpGame(ctx, ch.id, winnerId);
+      }
+    }
+  }
+});
+
 // Handle withdrawal buttons
 bot.action('withdraw_all', async (ctx) => {
   await walletHandler.handleWithdrawAll(ctx);
