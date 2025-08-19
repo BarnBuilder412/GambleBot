@@ -17,14 +17,15 @@ export class MenuHandler {
 
   async handleStart(ctx: Context): Promise<void> {
     const user = await this.userService.getOrCreateUser(ctx);
+    const uid = ctx.from?.id;
 
     await ctx.reply(
       `Welcome, ${ctx.from?.first_name}!\nBalance: ${user.balance.toFixed(4)} $`,
       Markup.inlineKeyboard([
-        [Markup.button.callback("🎲 Play", "play")],
-        [Markup.button.callback("💰 Deposit Address", "deposit")],
-        [Markup.button.callback("🏧 Withdraw", "withdraw")],
-        [Markup.button.callback("⚙️ Settings", "settings")],
+        [Markup.button.callback("🎲 Play", `play_u${uid}`)],
+        [Markup.button.callback("💰 Deposit Address", `deposit_u${uid}`)],
+        [Markup.button.callback("🏧 Withdraw", `withdraw_u${uid}`)],
+        [Markup.button.callback("⚙️ Settings", `settings_u${uid}`)],
       ])
     );
   }
@@ -32,17 +33,19 @@ export class MenuHandler {
   async handlePlay(ctx: Context): Promise<void> {
     await ctx.answerCbQuery();
     const games = this.gameManager.getAvailableGames();
+    const uid = ctx.from?.id;
     
     await ctx.reply(
       "Choose a game:",
       Markup.inlineKeyboard(
-        games.map((g) => Markup.button.callback(g, "game_" + g))
+        games.map((g) => Markup.button.callback(g, `game_${g}_u${uid}`))
       )
     );
   }
 
   async handleGameSelection(ctx: Context, gameName: string): Promise<void> {
     await ctx.answerCbQuery();
+    const uid = ctx.from?.id;
     
     if (!this.gameManager.isValidGame(gameName)) {
       await ctx.reply("Invalid game selected.");
@@ -84,7 +87,7 @@ export class MenuHandler {
 
     // Add back button
     wagerButtons.push([
-      Markup.button.callback("🔙 Back", "play")
+      Markup.button.callback("🔙 Back", `play_u${uid}`)
     ]);
 
     await ctx.reply(
@@ -230,16 +233,17 @@ Good luck! 🍀`;
     
     ctx.session.game = gameName;
     ctx.session.wager = wager;
+    const uid = ctx.from?.id;
     
     await ctx.reply(
       `✅ Wager set: ${wager} ETH for ${gameName}\n\nChoose how to play:`,
       Markup.inlineKeyboard([
         [
-          Markup.button.callback('🤖 Play vs Bot', `pve_${gameName}`),
-          Markup.button.callback('🧑‍🤝‍🧑 Create Challenge', `pvp_create_${gameName}`)
+          Markup.button.callback('🤖 Play vs Bot', `pve_${gameName}_u${uid}`),
+          Markup.button.callback('🧑‍🤝‍🧑 Create Challenge', `pvp_create_${gameName}_u${uid}`)
         ],
         [Markup.button.callback('📝 View Open Challenges', `pvp_list_${gameName}`)],
-        [Markup.button.callback('🔙 Back', 'play')]
+        [Markup.button.callback('🔙 Back', `play_u${uid}`)]
       ])
     );
   }
@@ -247,6 +251,7 @@ Good luck! 🍀`;
   async handlePlayVsBot(ctx: Context, gameName: string): Promise<void> {
     await ctx.answerCbQuery();
     const wager = ctx.session.wager;
+    const uid = ctx.from?.id;
     if (!wager) {
       await ctx.reply("Please pick a wager first.");
       return;
@@ -262,8 +267,8 @@ Good luck! 🍀`;
             await ctx.reply(
               `${username} ${diceResult.message}`,
               Markup.inlineKeyboard([
-                [Markup.button.callback('🎲 Play Dice Again', 'play_again_Dice'), Markup.button.callback('🎮 Other Games', 'play')],
-                [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+                [Markup.button.callback('🎲 Play Dice Again', `play_again_Dice_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
+                [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
               ])
             );
           } else {
@@ -279,7 +284,7 @@ Good luck! 🍀`;
           '🪙 **Coinflip Game Ready!**\n\nChoose your side:',
           {
             parse_mode: "Markdown",
-            ...Markup.inlineKeyboard([[Markup.button.callback('🪙 Heads', 'coinflip_heads'), Markup.button.callback('🪙 Tails', 'coinflip_tails')]])
+            ...Markup.inlineKeyboard([[Markup.button.callback('🪙 Heads', `coinflip_heads_u${uid}`), Markup.button.callback('🪙 Tails', `coinflip_tails_u${uid}`)]])
           }
         );
         break;
@@ -294,8 +299,8 @@ Good luck! 🍀`;
             await ctx.reply(
               `${username} ${bowlingResult.message}`,
               Markup.inlineKeyboard([
-                [Markup.button.callback('🎳 Play Bowling Again', 'play_again_Bowling'), Markup.button.callback('🎮 Other Games', 'play')],
-                [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+                [Markup.button.callback('🎳 Play Bowling Again', `play_again_Bowling_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
+                [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
               ])
             );
           } else {
@@ -311,6 +316,7 @@ Good luck! 🍀`;
   async handleCreateChallenge(ctx: Context, gameName: string): Promise<void> {
     await ctx.answerCbQuery();
     const wager = ctx.session.wager;
+    const uid = ctx.from?.id;
     if (!wager) {
       await ctx.reply("Please pick a wager first.");
       return;
@@ -320,7 +326,7 @@ Good luck! 🍀`;
       `📣 Challenge created for ${gameName} at ${wager} ETH!\nChallenge #${challenge.id}. Waiting for an opponent...`,
       Markup.inlineKeyboard([
         [Markup.button.callback('🗒 View Open Challenges', `pvp_list_${gameName}`)],
-        [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+        [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
       ])
     );
   }
@@ -328,6 +334,7 @@ Good luck! 🍀`;
   async handleListChallenges(ctx: Context, gameName: string): Promise<void> {
     await ctx.answerCbQuery();
     const open = await this.multiplayer.listOpenChallenges(gameName);
+    const uid = ctx.from?.id;
     if (open.length === 0) {
       await ctx.reply(`No open challenges for ${gameName} yet. Create one!`);
       return;
@@ -338,7 +345,7 @@ Good luck! 🍀`;
         `pvp_accept_${c.id}`
       )
     ]);
-    rows.push([Markup.button.callback('🔙 Back', 'play')]);
+    rows.push([Markup.button.callback('🔙 Back', `play_u${uid}`)]);
     await ctx.reply(
       `Open challenges for ${gameName}:`,
       Markup.inlineKeyboard(rows)
@@ -352,6 +359,7 @@ Good luck! 🍀`;
     
     // Clear any existing session
     ctx.session = {};
+    const uid = ctx.from?.id;
     
     // Start the game selection process again
     await this.handleGameSelection(ctx, gameName);

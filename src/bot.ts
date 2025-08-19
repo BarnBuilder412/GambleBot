@@ -36,8 +36,21 @@ interface SessionData {
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Enable in-memory session
-bot.use(session({ defaultSession: () => ({}) }));
+// Enable in-memory session (per user per chat) for group-safe state
+bot.use(session({
+  defaultSession: () => ({}),
+  getSessionKey: (ctx) => {
+    const fromId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    if (fromId && chatId) return `${chatId}:${fromId}`;
+    if (fromId) return `${fromId}`;
+    return undefined;
+  }
+}));
+// Group-friendly command to start playing
+bot.command('play', async (ctx) => {
+  await menuHandler.handleStart(ctx);
+});
 
 // Initialize services and handlers
 const userService = new UserService();
@@ -45,6 +58,16 @@ const gameManager = new GameManager(userService);
 const menuHandler = new MenuHandler(userService, gameManager);
 const walletHandler = new WalletHandler(userService);
 const gameHandler = new GameHandler(gameManager);
+
+// Guard: ensure callback button is used by the intended user
+const ensureOwner = async (ctx: any, expectedUserIdStr: string) => {
+  const expected = parseInt(expectedUserIdStr, 10);
+  if (!ctx.from || ctx.from.id !== expected) {
+    await ctx.answerCbQuery('This button is not for you');
+    return false;
+    }
+  return true;
+};
 
 // Bot command and action handlers
 bot.start(async (ctx) => {
@@ -56,26 +79,36 @@ bot.start(async (ctx) => {
   await menuHandler.handleStart(ctx);
 });
 
-bot.action("play", async (ctx) => {
+bot.action(/play_u(\d+)/, async (ctx) => {
+  const uid = ctx.match?.[1];
+  if (!(await ensureOwner(ctx, uid))) return;
   await menuHandler.handlePlay(ctx);
 });
 
-bot.action(/game_(.+)/, async (ctx) => {
+bot.action(/game_(.+)_u(\d+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
+  const uid = ctx.match?.[2];
+  if (!(await ensureOwner(ctx, uid))) return;
   if (gameName) {
     await menuHandler.handleGameSelection(ctx, gameName);
   }
 });
 
-bot.action("deposit", async (ctx) => {
+bot.action(/deposit_u(\d+)/, async (ctx) => {
+  const uid = ctx.match?.[1];
+  if (!(await ensureOwner(ctx, uid))) return;
   await walletHandler.handleDeposit(ctx);
 });
 
-bot.action("withdraw", async (ctx) => {
+bot.action(/withdraw_u(\d+)/, async (ctx) => {
+  const uid = ctx.match?.[1];
+  if (!(await ensureOwner(ctx, uid))) return;
   await walletHandler.handleWithdraw(ctx);
 });
 
-bot.action("settings", async (ctx) => {
+bot.action(/settings_u(\d+)/, async (ctx) => {
+  const uid = ctx.match?.[1];
+  if (!(await ensureOwner(ctx, uid))) return;
   await menuHandler.handleSettings(ctx);
 });
 
@@ -92,43 +125,54 @@ bot.action("coinflip_rules", async (ctx) => {
 });
 
 // Handle "Play Again" buttons
-bot.action(/play_again_(.+)/, async (ctx) => {
+bot.action(/play_again_(.+)_u(\d+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
+  const uid = ctx.match?.[2];
+  if (!(await ensureOwner(ctx, uid))) return;
   if (gameName) {
     await menuHandler.handlePlayAgain(ctx, gameName);
   }
 });
 
 // Handle "Main Menu" button
-bot.action("main_menu", async (ctx) => {
+bot.action(/main_menu_u(\d+)/, async (ctx) => {
+  const uid = ctx.match?.[1];
+  if (!(await ensureOwner(ctx, uid))) return;
   await ctx.answerCbQuery();
   await menuHandler.handleStart(ctx);
 });
 
 // Handle wager selection buttons
-bot.action(/wager_(.+)_(.+)/, async (ctx) => {
+bot.action(/wager_(.+)_(.+)_u(\d+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
   const wagerAmount = ctx.match?.[2];
+  const uid = ctx.match?.[3];
+  if (!(await ensureOwner(ctx, uid))) return;
   if (gameName && wagerAmount) {
     await menuHandler.handleWagerSelection(ctx, gameName, wagerAmount);
   }
 });
 
 // PvE or PvP choices after wager
-bot.action(/pve_(.+)/, async (ctx) => {
+bot.action(/pve_(.+)_u(\d+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
+  const uid = ctx.match?.[2];
+  if (!(await ensureOwner(ctx, uid))) return;
   if (gameName) {
     await menuHandler.handlePlayVsBot(ctx, gameName);
   }
 });
 
-bot.action(/pvp_create_(.+)/, async (ctx) => {
+bot.action(/pvp_create_(.+)_u(\d+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
+  const uid = ctx.match?.[2];
+  if (!(await ensureOwner(ctx, uid))) return;
   if (gameName) {
     await menuHandler.handleCreateChallenge(ctx, gameName);
   }
 });
 
+// pvp_list is intentionally open so others can discover challenges
 bot.action(/pvp_list_(.+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
   if (gameName) {
@@ -156,19 +200,22 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
 
       const creatorUser = ch.creator;
       const opponentUser = ch.opponent!;
-      const creatorId = creatorUser.telegramId;
-      const opponentId = opponentUser.telegramId;
+      const groupChatId = ch.isGroup && ch.chatId ? ch.chatId : undefined;
+      const chatA = groupChatId ?? creatorUser.telegramId; // message target for creator side
+      const chatB = groupChatId ?? opponentUser.telegramId; // message target for opponent side
+      const userAId = creatorUser.telegramId; // actual user telegramIds for settlement
+      const userBId = opponentUser.telegramId;
       const display = (u: { username?: string | null; telegramId: number }) =>
         u.username ? `@${u.username}` : `${u.telegramId}`;
 
       if (ch.game === 'Dice') {
         // Inform both players
-        await ctx.telegram.sendMessage(creatorId, `🎲 PvP Dice vs ${display(opponentUser)}! Rolling dice for both players...`);
-        await ctx.telegram.sendMessage(opponentId, `🎲 PvP Dice vs ${display(creatorUser)}! Rolling dice for both players...`);
+        const intro = `🎲 PvP Dice: ${display(creatorUser)} vs ${display(opponentUser)}! Rolling dice for both players...`;
+        await ctx.telegram.sendMessage(chatA, intro);
 
         // Roll for both players so each sees their own animation
-        const creatorRollMsg = await ctx.telegram.sendDice(creatorId, { emoji: '🎲' });
-        const opponentRollMsg = await ctx.telegram.sendDice(opponentId, { emoji: '🎲' });
+        const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎲' });
+        const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎲' });
         const creatorRoll = creatorRollMsg.dice?.value || 1;
         const opponentRoll = opponentRollMsg.dice?.value || 1;
 
@@ -181,10 +228,10 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
             let oVal = opponentRoll;
             while (tries < 5 && cVal === oVal) {
               const tieNote = `🤝 Tie (${cVal} vs ${oVal})! Rerolling...`;
-              await ctx.telegram.sendMessage(creatorId, tieNote);
-              await ctx.telegram.sendMessage(opponentId, tieNote);
-              const cMsg = await ctx.telegram.sendDice(creatorId, { emoji: '🎲' });
-              const oMsg = await ctx.telegram.sendDice(opponentId, { emoji: '🎲' });
+              await ctx.telegram.sendMessage(chatA, tieNote);
+              if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
+              const cMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎲' });
+              const oMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎲' });
               cVal = cMsg.dice?.value || 1;
               oVal = oMsg.dice?.value || 1;
               tries++;
@@ -192,31 +239,31 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
             setTimeout(async () => {
               if (cVal === oVal) {
                 const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
-                await ctx.telegram.sendMessage(creatorId, drawMsg);
-                await ctx.telegram.sendMessage(opponentId, drawMsg);
+                await ctx.telegram.sendMessage(chatA, drawMsg);
+                if (!groupChatId) await ctx.telegram.sendMessage(chatB, drawMsg);
                 await mp.completeDraw(ch.id);
               } else {
-                const winnerId = cVal > oVal ? creatorId : opponentId;
-                const summary = `Result: ${display(creatorUser)} rolled ${cVal} • ${display(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerId === creatorId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
-                await ctx.telegram.sendMessage(creatorId, summary);
-                await ctx.telegram.sendMessage(opponentId, summary);
-                await mp.settlePvpGame(ctx, ch.id, winnerId);
+                const winnerUserId = cVal > oVal ? userAId : userBId;
+                const summary = `Result: ${display(creatorUser)} rolled ${cVal} • ${display(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerUserId === userAId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+                await ctx.telegram.sendMessage(chatA, summary);
+                if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
+                await mp.settlePvpGame(ctx, ch.id, winnerUserId);
               }
             }, 4000);
           } else {
-            const winnerId = creatorRoll > opponentRoll ? creatorId : opponentRoll > creatorRoll ? opponentId : Math.random() < 0.5 ? creatorId : opponentId;
-            const summary = `Result: ${display(creatorUser)} rolled ${creatorRoll} • ${display(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerId === creatorId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
-            await ctx.telegram.sendMessage(creatorId, summary);
-            await ctx.telegram.sendMessage(opponentId, summary);
-            await mp.settlePvpGame(ctx, ch.id, winnerId);
+            const winnerUserId = creatorRoll > opponentRoll ? userAId : userBId;
+            const summary = `Result: ${display(creatorUser)} rolled ${creatorRoll} • ${display(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerUserId === userAId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+            await ctx.telegram.sendMessage(chatA, summary);
+            if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
+            await mp.settlePvpGame(ctx, ch.id, winnerUserId);
           }
         }, 4000);
       } else if (ch.game === 'Bowling') {
-        await ctx.telegram.sendMessage(creatorId, `🎳 PvP Bowling vs ${display(opponentUser)}! Rolling for both players...`);
-        await ctx.telegram.sendMessage(opponentId, `🎳 PvP Bowling vs ${display(creatorUser)}! Rolling for both players...`);
+        const intro = `🎳 PvP Bowling: ${display(creatorUser)} vs ${display(opponentUser)}! Rolling for both players...`;
+        await ctx.telegram.sendMessage(chatA, intro);
 
-        const creatorRollMsg = await ctx.telegram.sendDice(creatorId, { emoji: '🎳' });
-        const opponentRollMsg = await ctx.telegram.sendDice(opponentId, { emoji: '🎳' });
+        const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎳' });
+        const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎳' });
         const creatorTelegramVal = creatorRollMsg.dice?.value || 1;
         const opponentTelegramVal = opponentRollMsg.dice?.value || 1;
 
@@ -232,10 +279,10 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
             let oPins = opponentPins;
             while (tries < 5 && cPins === oPins) {
               const tieNote = `🤝 Tie (${cPins} vs ${oPins})! Rerolling...`;
-              await ctx.telegram.sendMessage(creatorId, tieNote);
-              await ctx.telegram.sendMessage(opponentId, tieNote);
-              const cMsg2 = await ctx.telegram.sendDice(creatorId, { emoji: '🎳' });
-              const oMsg2 = await ctx.telegram.sendDice(opponentId, { emoji: '🎳' });
+              await ctx.telegram.sendMessage(chatA, tieNote);
+              if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
+              const cMsg2 = await ctx.telegram.sendDice(chatA, { emoji: '🎳' });
+              const oMsg2 = await ctx.telegram.sendDice(chatB, { emoji: '🎳' });
               cPins = mapPins(cMsg2.dice?.value || 1);
               oPins = mapPins(oMsg2.dice?.value || 1);
               tries++;
@@ -243,39 +290,36 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
             setTimeout(async () => {
               if (cPins === oPins) {
                 const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
-                await ctx.telegram.sendMessage(creatorId, drawMsg);
-                await ctx.telegram.sendMessage(opponentId, drawMsg);
+                await ctx.telegram.sendMessage(chatA, drawMsg, { parse_mode: 'Markdown' });
+                if (!groupChatId) await ctx.telegram.sendMessage(chatB, drawMsg, { parse_mode: 'Markdown' });
                 await mp.completeDraw(ch.id);
               } else {
-                const winnerId = cPins > oPins ? creatorId : opponentId;
-                const summary = `Result: ${display(creatorUser)} knocked ${cPins}/10 • ${display(opponentUser)} knocked ${oPins}/10\n🏆 Winner: ${winnerId === creatorId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
-                await ctx.telegram.sendMessage(creatorId, summary, { parse_mode: 'Markdown' });
-                await ctx.telegram.sendMessage(opponentId, summary, { parse_mode: 'Markdown' });
-                await mp.settlePvpGame(ctx, ch.id, winnerId);
+                const winnerUserId = cPins > oPins ? userAId : userBId;
+                const summary = `Result: ${display(creatorUser)} knocked ${cPins}/10 • ${display(opponentUser)} knocked ${oPins}/10\n🏆 Winner: ${winnerUserId === userAId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+                await ctx.telegram.sendMessage(chatA, summary, { parse_mode: 'Markdown' });
+                if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary, { parse_mode: 'Markdown' });
+                await mp.settlePvpGame(ctx, ch.id, winnerUserId);
               }
             }, 4000);
           } else {
-            const winnerId = creatorPins > opponentPins ? creatorId : opponentPins > creatorPins ? opponentId : Math.random() < 0.5 ? creatorId : opponentId;
-            const summary = `Result: ${display(creatorUser)} knocked ${creatorPins}/10 • ${display(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerId === creatorId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
-            await ctx.telegram.sendMessage(creatorId, summary, { parse_mode: 'Markdown' });
-            await ctx.telegram.sendMessage(opponentId, summary, { parse_mode: 'Markdown' });
-            await mp.settlePvpGame(ctx, ch.id, winnerId);
+            const winnerUserId = creatorPins > opponentPins ? userAId : userBId;
+            const summary = `Result: ${display(creatorUser)} knocked ${creatorPins}/10 • ${display(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+            await ctx.telegram.sendMessage(chatA, summary, { parse_mode: 'Markdown' });
+            if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary, { parse_mode: 'Markdown' });
+            await mp.settlePvpGame(ctx, ch.id, winnerUserId);
           }
         }, 4000);
       } else if (ch.game === 'Coinflip') {
-        const creatorSide = 'heads';
-        const opponentSide = 'tails';
         const intro = `🪙 PvP Coinflip! ${display(creatorUser)} = HEADS, ${display(opponentUser)} = TAILS. Flipping...`;
-        await ctx.telegram.sendMessage(creatorId, intro);
-        await ctx.telegram.sendMessage(opponentId, intro);
+        await ctx.telegram.sendMessage(chatA, intro);
         // Animate simple flip
         const resultIsHeads = Math.random() < 0.5;
         const resultText = resultIsHeads ? 'HEADS' : 'TAILS';
-        const winnerId = resultIsHeads ? creatorId : opponentId;
-        const summary = `Result: ${resultText}\n🏆 Winner: ${winnerId === creatorId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
-        await ctx.telegram.sendMessage(creatorId, summary, { parse_mode: 'Markdown' });
-        await ctx.telegram.sendMessage(opponentId, summary, { parse_mode: 'Markdown' });
-        await mp.settlePvpGame(ctx, ch.id, winnerId);
+        const winnerUserId = resultIsHeads ? userAId : userBId;
+        const summary = `Result: ${resultText}\n🏆 Winner: ${winnerUserId === userAId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+        await ctx.telegram.sendMessage(chatA, summary, { parse_mode: 'Markdown' });
+        if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary, { parse_mode: 'Markdown' });
+        await mp.settlePvpGame(ctx, ch.id, winnerUserId);
       }
     }
   }
@@ -323,12 +367,16 @@ bot.action(/dice_guess_(\d)/, async (ctx) => {
   await gameHandler.handleDiceGuess(ctx, guess);
 });
 
-// Handle coinflip guess
-bot.action('coinflip_heads', async (ctx) => {
+// Handle coinflip guess (guarded per user)
+bot.action(/coinflip_heads_u(\d+)/, async (ctx) => {
+  const uid = ctx.match?.[1];
+  if (!(await ensureOwner(ctx, uid))) return;
   await gameHandler.handleCoinflipGuess(ctx, 'heads');
 });
 
-bot.action('coinflip_tails', async (ctx) => {
+bot.action(/coinflip_tails_u(\d+)/, async (ctx) => {
+  const uid = ctx.match?.[1];
+  if (!(await ensureOwner(ctx, uid))) return;
   await gameHandler.handleCoinflipGuess(ctx, 'tails');
 });
 

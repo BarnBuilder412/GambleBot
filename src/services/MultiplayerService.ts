@@ -17,6 +17,8 @@ export class MultiplayerService {
     challenge.game = game;
     challenge.wager = wager;
     challenge.status = "open";
+    challenge.chatId = ctx.chat?.id ?? null;
+    challenge.isGroup = (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup');
     await repo.save(challenge);
 
     return challenge;

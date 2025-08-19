@@ -22,18 +22,57 @@ export class WalletHandler {
     const base64Data = qrCodeDataUrl.replace(/^data:image\/png;base64,/, "");
 
     const buffer = Buffer.from(base64Data, "base64");
-    await ctx.replyWithPhoto(
-      { source: buffer },
-      {
-        caption: `Your deposit Ethereum address:\n\`${depositAddress}\``,
-        parse_mode: "MarkdownV2",
+    const chatType = ctx.chat?.type;
+    const userId = ctx.from?.id;
+    if ((chatType === 'group' || chatType === 'supergroup') && userId) {
+      try {
+        // await ctx.reply("🔐 I've sent your deposit address in a private message.");
+        await ctx.telegram.sendPhoto(
+          userId,
+          { source: buffer },
+          { caption: `Your deposit Ethereum address:\n\`${depositAddress}\``, parse_mode: 'MarkdownV2' }
+        );
+      } catch (e) {
+        const me = await ctx.telegram.getMe();
+        const link = `https://t.me/${me.username}?start=deposit`;
+        await ctx.reply(`Please open a private chat with me to view your deposit address: ${link}`);
       }
-    );
+    } else {
+      await ctx.replyWithPhoto(
+        { source: buffer },
+        {
+          caption: `Your deposit Ethereum address:\n\`${depositAddress}\``,
+          parse_mode: "MarkdownV2",
+        }
+      );
+    }
   }
 
   async handleWithdraw(ctx: Context): Promise<void> {
     await ctx.answerCbQuery();
 
+    const chatType = ctx.chat?.type;
+    const userId = ctx.from?.id;
+    if ((chatType === 'group' || chatType === 'supergroup') && userId) {
+      try {
+        // await ctx.reply("🔐 I've sent you a private message to start your withdrawal.");
+        await ctx.telegram.sendMessage(
+          userId,
+          '💰 Withdraw ETH\n\nPress the button below to start your private withdrawal flow:',
+          Markup.inlineKeyboard([[Markup.button.callback('▶️ Start Withdrawal', `start_withdraw_u${userId}`)]] as any)
+        );
+      } catch (e) {
+        const me = await ctx.telegram.getMe();
+        const link = `https://t.me/${me.username}?start=withdraw`;
+        await ctx.reply(`Please open a private chat with me to withdraw: ${link}`);
+      }
+      return;
+    }
+
+    await this.startWithdrawFlow(ctx);
+  }
+
+  async startWithdrawFlow(ctx: Context): Promise<void> {
     const user = await this.userService.getOrCreateUser(ctx);
 
     // Check if user has any balance to withdraw
@@ -52,9 +91,7 @@ export class WalletHandler {
       `💰 **Withdraw Funds**\n\nCurrent balance: $${user.balance.toFixed(2)}\n\n🔐 Please enter your Ethereum wallet address:\n\nExample: 0x742d35Cc6634C0532925a3b8D4C2E8e4C7...`,
       {
         parse_mode: "Markdown",
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback('❌ Cancel Withdrawal', 'cancel_withdraw')]
-        ])
+        ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel Withdrawal', 'cancel_withdraw')]] as any)
       }
     );
   }

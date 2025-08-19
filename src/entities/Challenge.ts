@@ -30,6 +30,12 @@ export class Challenge {
   @Column({ type: "varchar", default: "open" })
   status!: ChallengeStatus;
 
+  @Column({ type: "bigint", nullable: true })
+  chatId?: number | null;
+
+  @Column({ type: "boolean", default: false })
+  isGroup!: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 }
