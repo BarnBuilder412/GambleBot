@@ -12,16 +12,22 @@ export class Dice extends BaseGame {
     user: User,
     wager: number,
     db: DataSource,
-    guess?: number
+    diceValue?: number
   ): Promise<{ message: string; winAmount: number }> {
-    const roll = Math.floor(Math.random() * 6) + 1;
-    if (!guess || guess < 1 || guess > 6) {
-      return { message: "Guess must be 1-6.", winAmount: 0 };
+    // Use provided dice value (from Telegram animation) or generate random for testing
+    const roll = diceValue || Math.floor(Math.random() * 6) + 1;
+    
+    let winAmount = 0;
+    let message = `🎲 The dice rolled: ${roll}\n`;
+
+    // New rule: Win if dice shows 4, 5, or 6
+    if (roll >= 4) {
+      winAmount = wager * 2; // 2x payout (50% chance)
+      message += `🎉 You won! Dice shows ${roll} (4-6 wins). You earn ${winAmount.toFixed(4)} ETH!`;
+    } else {
+      message += `😢 You lost! Dice shows ${roll} (1-3 loses). Better luck next time!`;
     }
-    if (guess === roll) {
-      const winAmount = wager * 5;
-      return { message: `Dice rolled ${roll}. You won ${winAmount} ETH!`, winAmount };
-    }
-    return { message: `Dice rolled ${roll}. You lost your wager.`, winAmount: 0 };
+
+    return { message, winAmount };
   }
 }

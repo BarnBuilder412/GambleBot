@@ -12,31 +12,69 @@ export class Bowling extends BaseGame {
     user: User,
     wager: number,
     db: DataSource,
-    guess?: any
+    bowlingValue?: number
   ): Promise<{ message: string; winAmount: number }> {
-    const score = Math.floor(Math.random() * 301); // 0 to 300 inclusive
+    // Use provided bowling value (from Telegram animation) or generate random for testing
+    const telegramDiceValue = bowlingValue || Math.floor(Math.random() * 6) + 1; // 1-6 from Telegram
+    
+    // Map Telegram bowling dice (1-6) to actual bowling pins (0-10)
+    const actualPins = this.mapTelegramToActualPins(telegramDiceValue);
+    
+    // Debug logging
+    console.log(`Bowling: Telegram dice=${telegramDiceValue}, Mapped pins=${actualPins}`);
+    
+    let winAmount = 0;
+    let message = `🎳 **BOWLING RESULT** 🎳\n\n`;
+    message += this.getBowlingVisual(actualPins) + '\n\n';
+    message += `📊 Pins knocked down: ${actualPins}/10\n`;
 
-    if (score > 200) {
-      const winAmount = wager * 3;
-      return {
-        message: `🎳 You scored ${score}! Huge win! You earned ${winAmount.toFixed(
-          4
-        )} ETH!`,
-        winAmount,
-      };
-    } else if (score > 150) {
-      const winAmount = wager * 2;
-      return {
-        message: `🎳 You scored ${score}! Good job! You earned ${winAmount.toFixed(
-          4
-        )} ETH!`,
-        winAmount,
-      };
+    // Apply new betting rules
+    if (actualPins === 10) {
+      // Strike (10 pins) → payout x3
+      winAmount = wager * 3;
+      message += `🏆 **STRIKE!** All pins down!\n🎉 You win ${winAmount.toFixed(4)} ETH! (3x payout)`;
+    } else if (actualPins >= 7 && actualPins <= 9) {
+      // 7-9 pins → payout x1.5
+      winAmount = wager * 1.5;
+      message += `🔥 **Great roll!** ${actualPins} pins down!\n💰 You win ${winAmount.toFixed(4)} ETH! (1.5x payout)`;
     } else {
-      return {
-        message: `🎳 You scored ${score}. Sorry, you lost your wager.`,
-        winAmount: 0,
-      };
+      // 0-6 pins → loss
+      message += `😢 Only ${actualPins} pins down. You lost your wager.\n💪 Better luck next time!`;
     }
+
+    return { message, winAmount };
+  }
+
+  private mapTelegramToActualPins(telegramValue: number): number {
+    // Direct mapping from Telegram bowling dice (1-6) to bowling pins (0-10)
+    // This ensures consistency between animation and result
+    const mapping = {
+      1: 0,  // Gutter ball - no pins
+      2: 3,  // Poor roll - 3 pins
+      3: 5,  // Average roll - 5 pins  
+      4: 7,  // Good roll - 7 pins (wins 1.5x)
+      5: 9,  // Great roll - 9 pins (wins 1.5x)
+      6: 10  // Strike! - all pins (wins 3x)
+    };
+    
+    return mapping[telegramValue as keyof typeof mapping] || 0;
+  }
+
+  private getBowlingVisual(pins: number): string {
+    const visuals = {
+      0: '🎳 ⚪⚪⚪⚪⚪⚪⚪⚪⚪⚪ (Gutter ball!)',
+      1: '🎳 💥⚪⚪⚪⚪⚪⚪⚪⚪⚪ (1 pin)',
+      2: '🎳 💥💥⚪⚪⚪⚪⚪⚪⚪⚪ (2 pins)',
+      3: '🎳 💥💥💥⚪⚪⚪⚪⚪⚪⚪ (3 pins)',
+      4: '🎳 💥💥💥💥⚪⚪⚪⚪⚪⚪ (4 pins)',
+      5: '🎳 💥💥💥💥💥⚪⚪⚪⚪⚪ (5 pins)',
+      6: '🎳 💥💥💥💥💥💥⚪⚪⚪⚪ (6 pins)',
+      7: '🎳 💥💥💥💥💥💥💥⚪⚪⚪ (7 pins)',
+      8: '🎳 💥💥💥💥💥💥💥💥⚪⚪ (8 pins)',
+      9: '🎳 💥💥💥💥💥💥💥💥💥⚪ (9 pins)',
+      10: '🎳 💥💥💥💥💥💥💥💥💥💥 (STRIKE!)'
+    };
+    
+    return visuals[pins as keyof typeof visuals] || visuals[0];
   }
 }
