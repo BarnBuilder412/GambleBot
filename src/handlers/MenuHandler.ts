@@ -288,5 +288,4 @@ Good luck! 🍀`;
     
     // Start the game selection process again
     await this.handleGameSelection(ctx, gameName);
-  }
-} 
+  }}

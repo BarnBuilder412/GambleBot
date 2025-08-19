@@ -1,8 +1,9 @@
 // src/handlers/WalletHandler.ts
-import { Context } from "telegraf";
+import { Context, Markup } from "telegraf";
 import { UserService } from "../services/UserService";
 import { TransactionType } from "../entities/Transaction";
 import * as qrcode from "qrcode";
+import { isAddress } from "ethers";
 
 export class WalletHandler {
   private userService: UserService;
@@ -32,9 +33,186 @@ export class WalletHandler {
 
   async handleWithdraw(ctx: Context): Promise<void> {
     await ctx.answerCbQuery();
-    // Implement withdrawal scene or prompt for amount + integration with wallet service
-    await ctx.reply("Withdrawal functionality is not implemented in this example.");
+
+    const user = await this.userService.getOrCreateUser(ctx);
+
+    // Check if user has any balance to withdraw
+    if (user.balance <= 0) {
+      await ctx.reply(
+        "❌ **Insufficient Balance**\n\nYou don't have any ETH to withdraw.\nCurrent balance: 0.0000 ETH",
+        { parse_mode: "Markdown" }
+      );
+      return;
+    }
+
+    // Start withdrawal process
+    ctx.session.withdrawStep = 'address';
+
+    await ctx.reply(
+      `💰 **Withdraw ETH**\n\nCurrent balance: ${user.balance.toFixed(4)} ETH\n\n🔐 Please enter your Ethereum wallet address:\n\nExample: 0x742d35Cc6634C0532925a3b8D4C2E8e4C7...`,
+      {
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('❌ Cancel Withdrawal', 'cancel_withdraw')]
+        ])
+      }
+    );
   }
 
+  async handleWithdrawAddressInput(ctx: Context, address: string): Promise<boolean> {
+    // Validate Ethereum address
+    if (!this.isValidEthereumAddress(address)) {
+      await ctx.reply(
+        "❌ **Invalid Ethereum Address**\n\nPlease enter a valid Ethereum address.\n\nExample: 0x742d35Cc6634C0532925a3b8D4C2E8e4C7...",
+        {
+          parse_mode: "Markdown",
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancel Withdrawal', 'cancel_withdraw')]
+          ])
+        }
+      );
+      return true; // Handled, but invalid
+    }
 
+    // Address is valid, store it and ask for amount
+    ctx.session.withdrawAddress = address;
+    ctx.session.withdrawStep = 'amount';
+
+    const user = await this.userService.getOrCreateUser(ctx);
+
+    await ctx.reply(
+      `✅ **Valid Address Confirmed**\n\n📍 Withdrawal address:\n${address}\n\n💰 Available balance: ${user.balance.toFixed(4)} ETH\n\n💸 Enter withdrawal amount (ETH):`,
+      {
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('💰 Withdraw All', 'withdraw_all'),
+            Markup.button.callback('💰 Withdraw Half', 'withdraw_half')
+          ],
+          [Markup.button.callback('❌ Cancel Withdrawal', 'cancel_withdraw')]
+        ])
+      }
+    );
+
+    return true; // Successfully handled
+  }
+
+  async handleWithdrawAmountInput(ctx: Context, amountText: string): Promise<boolean> {
+    const amount = parseFloat(amountText);
+    const user = await this.userService.getOrCreateUser(ctx);
+
+    // Validate amount
+    if (isNaN(amount) || amount <= 0) {
+      await ctx.reply(
+        "❌ **Invalid Amount**\n\nPlease enter a valid withdrawal amount.\n\nExample: 0.05",
+        {
+          parse_mode: "Markdown",
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.callback('💰 Withdraw All', 'withdraw_all'),
+              Markup.button.callback('💰 Withdraw Half', 'withdraw_half')
+            ],
+            [Markup.button.callback('❌ Cancel Withdrawal', 'cancel_withdraw')]
+          ])
+        }
+      );
+      return true; // Handled, but invalid
+    }
+
+    // Check if user has sufficient balance
+    if (amount > user.balance) {
+      await ctx.reply(
+        `❌ **Insufficient Balance**\n\nRequested: ${amount.toFixed(4)} ETH\nAvailable: ${user.balance.toFixed(4)} ETH\n\nPlease enter a smaller amount.`,
+        {
+          parse_mode: "Markdown",
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.callback('💰 Withdraw All', 'withdraw_all'),
+              Markup.button.callback('💰 Withdraw Half', 'withdraw_half')
+            ],
+            [Markup.button.callback('❌ Cancel Withdrawal', 'cancel_withdraw')]
+          ])
+        }
+      );
+      return true; // Handled, but insufficient
+    }
+
+    // Process withdrawal
+    await this.processWithdrawal(ctx, amount);
+    return true;
+  }
+
+  async handleWithdrawAll(ctx: Context): Promise<void> {
+    await ctx.answerCbQuery();
+    const user = await this.userService.getOrCreateUser(ctx);
+    await this.processWithdrawal(ctx, user.balance);
+  }
+
+  async handleWithdrawHalf(ctx: Context): Promise<void> {
+    await ctx.answerCbQuery();
+    const user = await this.userService.getOrCreateUser(ctx);
+    const halfAmount = user.balance / 2;
+    await this.processWithdrawal(ctx, halfAmount);
+  }
+
+  async handleCancelWithdraw(ctx: Context): Promise<void> {
+    await ctx.answerCbQuery();
+
+    // Clear withdrawal session
+    ctx.session.withdrawStep = undefined;
+    ctx.session.withdrawAddress = undefined;
+
+    await ctx.reply(
+      "❌ **Withdrawal Cancelled**\n\nYour withdrawal request has been cancelled.",
+      {
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+        ])
+      }
+    );
+  }
+
+  private async processWithdrawal(ctx: Context, amount: number): Promise<void> {
+    const user = await this.userService.getOrCreateUser(ctx);
+    const address = ctx.session.withdrawAddress!;
+
+    try {
+      // Deduct amount from user balance
+      await this.userService.updateBalance(user, -amount, TransactionType.WITHDRAW, `Withdrawal to ${address}`);
+
+      // Clear withdrawal session
+      ctx.session.withdrawStep = undefined;
+      ctx.session.withdrawAddress = undefined;
+
+      await ctx.reply(
+        `✅ **Withdrawal Processed**\n\n💰 Amount: ${amount.toFixed(4)} ETH\n📍 To address: ${address}\n\n💳 New balance: ${(user.balance - amount).toFixed(4)} ETH\n\n⏳ Your withdrawal will be processed within 24 hours.`,
+        {
+          parse_mode: "Markdown",
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+          ])
+        }
+      );
+
+    } catch (error) {
+      await ctx.reply(
+        "❌ **Withdrawal Failed**\n\nThere was an error processing your withdrawal. Please try again later.",
+        {
+          parse_mode: "Markdown",
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+          ])
+        }
+      );
+    }
+  }
+
+  private isValidEthereumAddress(address: string): boolean {
+    try {
+      return isAddress(address);
+    } catch (error) {
+      return false;
+    }
+  }
 } 

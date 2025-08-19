@@ -30,6 +30,8 @@ interface SessionData {
   game?: string;
   wager?: number;
   awaitingGuess?: boolean;
+  withdrawStep?: 'address' | 'amount';
+  withdrawAddress?: string;
 }
 
 const bot = new Telegraf(BOT_TOKEN);
@@ -46,11 +48,11 @@ const gameHandler = new GameHandler(gameManager);
 
 // Bot command and action handlers
 bot.start(async (ctx) => {
-console.log("start");
+  console.log("start");
   if (!AppDataSource.isInitialized) {
     await AppDataSource.initialize();
   }
-  
+
   await menuHandler.handleStart(ctx);
 });
 
@@ -112,13 +114,40 @@ bot.action(/wager_(.+)_(.+)/, async (ctx) => {
   }
 });
 
+// Handle withdrawal buttons
+bot.action('withdraw_all', async (ctx) => {
+  await walletHandler.handleWithdrawAll(ctx);
+});
 
+bot.action('withdraw_half', async (ctx) => {
+  await walletHandler.handleWithdrawHalf(ctx);
+});
 
-// Listen for wager input after game selection
+bot.action('cancel_withdraw', async (ctx) => {
+  await walletHandler.handleCancelWithdraw(ctx);
+});
+
+// Listen for text input (wager, withdrawal address, withdrawal amount)
 bot.on('text', async (ctx) => {
-  // Fallback to original wager input handler (for backward compatibility)
-  const handled = await gameHandler.handleWagerInput(ctx);
-  // If not handled by game handler, could add other text handlers here
+  if (ctx.message && 'text' in ctx.message) {
+    const text = ctx.message.text;
+
+    // Handle withdrawal address input
+    if (ctx.session.withdrawStep === 'address') {
+      const handled = await walletHandler.handleWithdrawAddressInput(ctx, text);
+      if (handled) return;
+    }
+
+    // Handle withdrawal amount input
+    if (ctx.session.withdrawStep === 'amount') {
+      const handled = await walletHandler.handleWithdrawAmountInput(ctx, text);
+      if (handled) return;
+    }
+
+    // Fallback to original wager input handler (for backward compatibility)
+    const handled = await gameHandler.handleWagerInput(ctx);
+    // If not handled by game handler, could add other text handlers here
+  }
 });
 
 // Handle dice guess (legacy - no longer used since dice is automatic)
@@ -138,25 +167,25 @@ bot.action('coinflip_tails', async (ctx) => {
 
 // Launch bot
 bot.launch()
-    .then(() => {
-        console.log(`🎰 GambleBot is running!`);
-        console.log('🚀 Bot is ready to accept users!');
-    })
-    .catch((err) => {
-        console.error('❌ Failed to start bot:', err);
-        process.exit(1);
-    });
+  .then(() => {
+    console.log(`🎰 GambleBot is running!`);
+    console.log('🚀 Bot is ready to accept users!');
+  })
+  .catch((err) => {
+    console.error('❌ Failed to start bot:', err);
+    process.exit(1);
+  });
 
 // Enable graceful stop
 process.once('SIGINT', () => {
-    console.log('\n🛑 Received SIGINT, shutting down gracefully...');
-    bot.stop('SIGINT');
+  console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+  bot.stop('SIGINT');
 });
 
 process.once('SIGTERM', () => {
-    console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
-    bot.stop('SIGTERM');
-}); 
+  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+  bot.stop('SIGTERM');
+});
 
 // Setup HTTPS webhook server
 (async () => {
@@ -165,7 +194,7 @@ process.once('SIGTERM', () => {
   bot.telegram.setWebhook(WEBHOOK_URL);
 
   http.createServer(bot.webhookCallback("/telegram-webhook"))
-  .listen(8443, () => {
+    .listen(8443, () => {
       console.log("Bot listening on port 8443");
-  });
+    });
 })();
