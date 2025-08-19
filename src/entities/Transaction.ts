@@ -13,7 +13,7 @@ import {
     WITHDRAW = "withdraw",
     WAGER = "wager",
     WIN = "win",
-    BONUS = "bonus",
+    BET = "bet",
   }
   
   @Entity()

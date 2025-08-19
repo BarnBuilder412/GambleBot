@@ -23,9 +23,6 @@ import {
     @Column({ type: "float", default: 0 })
     balance!: number;
   
-    @Column({ type: "float", default: 0 })
-    bonusBalance!: number;
-  
     @Column({ nullable: true, unique: true })
     depositAddress?: string; // Ethereum address
   
