@@ -10,7 +10,8 @@ import { GameManager } from "./services/GameManager";
 import { MenuHandler } from "./handlers/MenuHandler";
 import { WalletHandler } from "./handlers/WalletHandler";
 import { GameHandler } from "./handlers/GameHandler";
-import { blockchainService } from "./services/BlockchainService";
+import { getUserDisplayFromUserPlain } from "./utils/userDisplay";
+import { formatUserMessage } from "./utils/userDisplay";
 
 dotenv.config();
 
@@ -190,7 +191,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
     const mp = new MultiplayerService(new UserService());
     const res = await mp.acceptChallenge(ctx, challengeId);
     await ctx.answerCbQuery();
-    await ctx.reply(res.message);
+    await ctx.reply(formatUserMessage(ctx, res.message));
     if (res.ok) {
       // Start the PvP game flow with both players' actions visible
       const { AppDataSource } = await import('./utils/db');
@@ -206,12 +207,11 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
       const chatB = groupChatId ?? opponentUser.telegramId; // message target for opponent side
       const userAId = creatorUser.telegramId; // actual user telegramIds for settlement
       const userBId = opponentUser.telegramId;
-      const display = (u: { username?: string | null; telegramId: number }) =>
-        u.username ? `@${u.username}` : `${u.telegramId}`;
+
 
       if (ch.game === 'Dice') {
         // Inform both players
-        const intro = `🎲 PvP Dice: ${display(creatorUser)} vs ${display(opponentUser)}! Rolling dice for both players...`;
+        const intro = `🎲 PvP Dice: ${getUserDisplayFromUserPlain(creatorUser)} vs ${getUserDisplayFromUserPlain(opponentUser)}! Rolling dice for both players...`;
         await ctx.telegram.sendMessage(chatA, intro);
 
         // Roll for both players so each sees their own animation
@@ -245,7 +245,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
                 await mp.completeDraw(ch.id);
               } else {
                 const winnerUserId = cVal > oVal ? userAId : userBId;
-                const summary = `Result: ${display(creatorUser)} rolled ${cVal} • ${display(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerUserId === userAId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+                const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${cVal} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
                 await ctx.telegram.sendMessage(chatA, summary);
                 if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
                 await mp.settlePvpGame(ctx, ch.id, winnerUserId);
@@ -253,14 +253,14 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
             }, 4000);
           } else {
             const winnerUserId = creatorRoll > opponentRoll ? userAId : userBId;
-            const summary = `Result: ${display(creatorUser)} rolled ${creatorRoll} • ${display(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerUserId === userAId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+            const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${creatorRoll} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
             await ctx.telegram.sendMessage(chatA, summary);
             if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
             await mp.settlePvpGame(ctx, ch.id, winnerUserId);
           }
         }, 4000);
       } else if (ch.game === 'Bowling') {
-        const intro = `🎳 PvP Bowling: ${display(creatorUser)} vs ${display(opponentUser)}! Rolling for both players...`;
+        const intro = `🎳 PvP Bowling: ${getUserDisplayFromUserPlain(creatorUser)} vs ${getUserDisplayFromUserPlain(opponentUser)}! Rolling for both players...`;
         await ctx.telegram.sendMessage(chatA, intro);
 
         const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎳' });
@@ -291,35 +291,35 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
             setTimeout(async () => {
               if (cPins === oPins) {
                 const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
-                await ctx.telegram.sendMessage(chatA, drawMsg, { parse_mode: 'Markdown' });
-                if (!groupChatId) await ctx.telegram.sendMessage(chatB, drawMsg, { parse_mode: 'Markdown' });
+                await ctx.telegram.sendMessage(chatA, drawMsg);
+                if (!groupChatId) await ctx.telegram.sendMessage(chatB, drawMsg);
                 await mp.completeDraw(ch.id);
               } else {
                 const winnerUserId = cPins > oPins ? userAId : userBId;
-                const summary = `Result: ${display(creatorUser)} knocked ${cPins}/10 • ${display(opponentUser)} knocked ${oPins}/10\n🏆 Winner: ${winnerUserId === userAId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
-                await ctx.telegram.sendMessage(chatA, summary, { parse_mode: 'Markdown' });
-                if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary, { parse_mode: 'Markdown' });
+                const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${cPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${oPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+                await ctx.telegram.sendMessage(chatA, summary);
+                if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
                 await mp.settlePvpGame(ctx, ch.id, winnerUserId);
               }
             }, 4000);
           } else {
             const winnerUserId = creatorPins > opponentPins ? userAId : userBId;
-            const summary = `Result: ${display(creatorUser)} knocked ${creatorPins}/10 • ${display(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
-            await ctx.telegram.sendMessage(chatA, summary, { parse_mode: 'Markdown' });
-            if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary, { parse_mode: 'Markdown' });
+            const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+            await ctx.telegram.sendMessage(chatA, summary);
+            if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
             await mp.settlePvpGame(ctx, ch.id, winnerUserId);
           }
         }, 4000);
       } else if (ch.game === 'Coinflip') {
-        const intro = `🪙 PvP Coinflip! ${display(creatorUser)} = HEADS, ${display(opponentUser)} = TAILS. Flipping...`;
+        const intro = `🪙 PvP Coinflip! ${getUserDisplayFromUserPlain(creatorUser)} = HEADS, ${getUserDisplayFromUserPlain(opponentUser)} = TAILS. Flipping...`;
         await ctx.telegram.sendMessage(chatA, intro);
         // Animate simple flip
         const resultIsHeads = Math.random() < 0.5;
         const resultText = resultIsHeads ? 'HEADS' : 'TAILS';
         const winnerUserId = resultIsHeads ? userAId : userBId;
-        const summary = `Result: ${resultText}\n🏆 Winner: ${winnerUserId === userAId ? display(creatorUser) : display(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
-        await ctx.telegram.sendMessage(chatA, summary, { parse_mode: 'Markdown' });
-        if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary, { parse_mode: 'Markdown' });
+        const summary = `Result: ${resultText}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+        await ctx.telegram.sendMessage(chatA, summary);
+        if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
         await mp.settlePvpGame(ctx, ch.id, winnerUserId);
       }
     }
@@ -381,46 +381,75 @@ bot.action(/coinflip_tails_u(\d+)/, async (ctx) => {
   await gameHandler.handleCoinflipGuess(ctx, 'tails');
 });
 
-// Launch bot
-bot.launch()
-  .then(async () => {
-    console.log(`🎰 GambleBot is running!`);
-    console.log('🚀 Bot is ready to accept users!');
-    
-    // Initialize database connection
+// Initialize bot
+async function startBot() {
+  try {
+    // 1. Initialize database first
     if (!AppDataSource.isInitialized) {
       await AppDataSource.initialize();
       console.log('📊 Database connection established');
     }
     
-    // Load existing deposit addresses and start blockchain watcher
-    await blockchainService.loadExistingAddresses();
-    blockchainService.startWatcher();
-  })
-  .catch((err) => {
+    // 2. Clear any existing webhook to avoid conflicts
+    try {
+      await bot.telegram.deleteWebhook();
+      console.log('🧹 Cleared existing webhook');
+    } catch (e) {
+      // Ignore if no webhook was set
+    }
+    
+    // 3. Launch bot
+    await bot.launch();
+    console.log(`🎰 GambleBot is running!`);
+    console.log('🚀 Bot is ready to accept users!');
+    console.log('💡 Note: Run "npm run watcher" separately to start blockchain monitoring');
+    
+  } catch (err) {
     console.error('❌ Failed to start bot:', err);
     process.exit(1);
-  });
+  }
+}
+
+// Start the bot
+startBot();
 
 // Enable graceful stop
+let server: http.Server;
 process.once('SIGINT', () => {
-  console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+  console.log('\n🛑 Received SIGINT, shutting down bot...');
   bot.stop('SIGINT');
+  if (server) {
+    server.close(() => {
+      console.log('🛑 HTTP server closed');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
 });
 
 process.once('SIGTERM', () => {
-  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+  console.log('\n🛑 Received SIGTERM, shutting down bot...');
   bot.stop('SIGTERM');
+  if (server) {
+    server.close(() => {
+      console.log('🛑 HTTP server closed');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
 });
 
 // Setup HTTPS webhook server
-(async () => {
-  await AppDataSource.initialize();
-
-  bot.telegram.setWebhook(WEBHOOK_URL);
-
-  http.createServer(bot.webhookCallback("/telegram-webhook"))
-    .listen(8443, () => {
-      console.log("Bot listening on port 8443");
-    });
-})();
+setTimeout(async () => {
+  try {
+    await bot.telegram.setWebhook(WEBHOOK_URL);
+    server = http.createServer(bot.webhookCallback("/telegram-webhook"))
+      .listen(8443, () => {
+        console.log("Bot listening on port 8443");
+      });
+  } catch (error) {
+    console.error('❌ Failed to setup webhook:', error);
+  }
+}, 1000); // Wait 1 second for bot to initialize

@@ -1,4 +1,14 @@
 {
+  "name": "gamblebot-blockchain",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "bot": "ts-node src/bot.ts",
+    "watcher": "ts-node src/blockchain-watcher.ts",
+    "show-addresses": "node show-addresses.js",
+    "sweep": "ts-node src/manual-sweep.ts"
+  },
   "dependencies": {
     "bip39": "^3.1.0",
     "dotenv": "^17.2.1",

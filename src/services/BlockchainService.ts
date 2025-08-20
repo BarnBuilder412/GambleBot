@@ -61,10 +61,11 @@ export class BlockchainService {
 
         console.log(`💰 Deposit detected: ${evt.amountWei} wei to ${evt.to} (tx: ${evt.txHash})`);
 
-        // Find user by deposit address
+        // Find user by deposit address (case-insensitive)
         const repo = AppDataSource.getRepository(User);
-        // Normalize both sides to checksum for safety
-        const user = await repo.findOne({ where: { depositAddress: evt.to } });
+        const user = await repo.createQueryBuilder('user')
+          .where('LOWER(user.depositAddress) = LOWER(:address)', { address: evt.to })
+          .getOne();
         
         if (!user) {
           console.error(`❌ No user found for deposit address ${evt.to} (ensure address saved in checksum form)`);
