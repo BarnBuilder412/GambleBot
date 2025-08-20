@@ -381,14 +381,33 @@ bot.action(/coinflip_tails_u(\d+)/, async (ctx) => {
   await gameHandler.handleCoinflipGuess(ctx, 'tails');
 });
 
-// Launch bot
-bot.launch()
+// Utility: Retry async function with exponential backoff
+async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 5, initialDelay = 2000): Promise<T> {
+  let attempt = 0;
+  let delay = initialDelay;
+  while (true) {
+    try {
+      return await fn();
+    } catch (err) {
+      attempt++;
+      if (attempt > maxRetries) {
+        throw err;
+      }
+      console.error(`Attempt ${attempt} failed: ${err instanceof Error ? err.message : err}. Retrying in ${delay / 1000}s...`);
+      await new Promise(res => setTimeout(res, delay));
+      delay *= 2; // Exponential backoff
+    }
+  }
+}
+
+// Launch bot with retry/backoff
+retryWithBackoff(() => bot.launch(), 5, 2000)
   .then(() => {
     console.log(`🎰 GambleBot is running!`);
     console.log('🚀 Bot is ready to accept users!');
   })
   .catch((err) => {
-    console.error('❌ Failed to start bot:', err);
+    console.error('❌ Failed to start bot after retries:', err);
     process.exit(1);
   });
 
@@ -403,11 +422,11 @@ process.once('SIGTERM', () => {
   bot.stop('SIGTERM');
 });
 
-// Setup HTTPS webhook server
+// Setup HTTPS webhook server with retry/backoff for setWebhook
 (async () => {
   await AppDataSource.initialize();
 
-  bot.telegram.setWebhook(WEBHOOK_URL);
+  await retryWithBackoff(() => bot.telegram.setWebhook(WEBHOOK_URL), 5, 2000);
 
   http.createServer(bot.webhookCallback("/telegram-webhook"))
     .listen(8443, () => {
