@@ -211,117 +211,259 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
 
 
       if (ch.game === 'Dice') {
-        // Inform both players
         const intro = `🎲 PvP Dice: ${getUserDisplayFromUserPlain(creatorUser)} vs ${getUserDisplayFromUserPlain(opponentUser)}! Rolling dice for both players...`;
         await ctx.telegram.sendMessage(chatA, intro);
+        // Send separate roll messages for each user in group
+        if (groupChatId) {
+          await ctx.telegram.sendMessage(groupChatId, `[${creatorUser.username}](tg://user?id=${creatorUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
+          const creatorRollMsg = await ctx.telegram.sendDice(groupChatId, { emoji: '🎲' });
+          await ctx.telegram.sendMessage(groupChatId, `[${opponentUser.username}](tg://user?id=${opponentUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
+          const opponentRollMsg = await ctx.telegram.sendDice(groupChatId, { emoji: '🎲' });
+          const creatorRoll = creatorRollMsg.dice?.value || 1;
+          const opponentRoll = opponentRollMsg.dice?.value || 1;
 
-        // Roll for both players so each sees their own animation
-        const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎲' });
-        const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎲' });
-        const creatorRoll = creatorRollMsg.dice?.value || 1;
-        const opponentRoll = opponentRollMsg.dice?.value || 1;
-
-        // Wait for animation
-        setTimeout(async () => {
-          if (creatorRoll === opponentRoll) {
-            // Tie -> reroll up to 5 times; if still tied declare draw
-            let tries = 0;
-            let cVal = creatorRoll;
-            let oVal = opponentRoll;
-            while (tries < 5 && cVal === oVal) {
-              const tieNote = `🤝 Tie (${cVal} vs ${oVal})! Rerolling...`;
-              await ctx.telegram.sendMessage(chatA, tieNote);
-              if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
-              const cMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎲' });
-              const oMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎲' });
-              cVal = cMsg.dice?.value || 1;
-              oVal = oMsg.dice?.value || 1;
-              tries++;
-            }
-            setTimeout(async () => {
-              if (cVal === oVal) {
-                const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
-                await ctx.telegram.sendMessage(chatA, drawMsg);
-                if (!groupChatId) await ctx.telegram.sendMessage(chatB, drawMsg);
-                await mp.completeDraw(ch.id);
-              } else {
-                const winnerUserId = cVal > oVal ? userAId : userBId;
-                const payoutEth = ch.wager * 2;
-                const payoutUsd = ethToUsd(payoutEth);
-                const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${cVal} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
-                await ctx.telegram.sendMessage(chatA, summary);
-                if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
-                await mp.settlePvpGame(ctx, ch.id, winnerUserId);
+          // Wait for animation
+          setTimeout(async () => {
+            if (creatorRoll === opponentRoll) {
+              // Tie -> reroll up to 5 times; if still tied declare draw
+              let tries = 0;
+              let cVal = creatorRoll;
+              let oVal = opponentRoll;
+              while (tries < 5 && cVal === oVal) {
+                const tieNote = `🤝 Tie (${cVal} vs ${oVal})! Rerolling...`;
+                await ctx.telegram.sendMessage(groupChatId, tieNote);
+                if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
+                const cMsg = await ctx.telegram.sendDice(groupChatId, { emoji: '🎲' });
+                const oMsg = await ctx.telegram.sendDice(groupChatId, { emoji: '🎲' });
+                cVal = cMsg.dice?.value || 1;
+                oVal = oMsg.dice?.value || 1;
+                tries++;
               }
-            }, 4000);
-          } else {
-            const winnerUserId = creatorRoll > opponentRoll ? userAId : userBId;
-            const payoutEth = ch.wager * 2;
-            const payoutUsd = ethToUsd(payoutEth);
-            const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${creatorRoll} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
-            await ctx.telegram.sendMessage(chatA, summary);
-            if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
-            await mp.settlePvpGame(ctx, ch.id, winnerUserId);
-          }
-        }, 4000);
+              setTimeout(async () => {
+                if (cVal === oVal) {
+                  const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
+                  await ctx.telegram.sendMessage(groupChatId, drawMsg);
+                  if (!groupChatId) await ctx.telegram.sendMessage(chatB, drawMsg);
+                  await mp.completeDraw(ch.id);
+                } else {
+                  const winnerUserId = cVal > oVal ? userAId : userBId;
+                  const payoutEth = ch.wager * 2;
+                  const payoutUsd = ethToUsd(payoutEth);
+                  const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${cVal} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+                  await ctx.telegram.sendMessage(groupChatId, summary);
+                  if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
+                  await mp.settlePvpGame(ctx, ch.id, winnerUserId);
+                }
+              }, 4000);
+            } else {
+              const winnerUserId = creatorRoll > opponentRoll ? userAId : userBId;
+              const payoutEth = ch.wager * 2;
+              const payoutUsd = ethToUsd(payoutEth);
+              const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${creatorRoll} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+              await ctx.telegram.sendMessage(groupChatId, summary);
+              if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
+              await mp.settlePvpGame(ctx, ch.id, winnerUserId);
+            }
+          }, 4000);
+        } else {
+          // Non-group PvP Dice logic
+          const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎲' });
+          const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎲' });
+          const creatorRoll = creatorRollMsg.dice?.value || 1;
+          const opponentRoll = opponentRollMsg.dice?.value || 1;
+
+          // Wait for animation
+          setTimeout(async () => {
+            if (creatorRoll === opponentRoll) {
+              // Tie -> reroll up to 5 times; if still tied declare draw
+              let tries = 0;
+              let cVal = creatorRoll;
+              let oVal = opponentRoll;
+              while (tries < 5 && cVal === oVal) {
+                const tieNote = `🤝 Tie (${cVal} vs ${oVal})! Rerolling...`;
+                await ctx.telegram.sendMessage(chatA, tieNote);
+                if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
+                const cMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎲' });
+                const oMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎲' });
+                cVal = cMsg.dice?.value || 1;
+                oVal = oMsg.dice?.value || 1;
+                tries++;
+              }
+              setTimeout(async () => {
+                if (cVal === oVal) {
+                  const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
+                  await ctx.telegram.sendMessage(chatA, drawMsg);
+                  if (!groupChatId) await ctx.telegram.sendMessage(chatB, drawMsg);
+                  await mp.completeDraw(ch.id);
+                } else {
+                  const winnerUserId = cVal > oVal ? userAId : userBId;
+                  const payoutEth = ch.wager * 2;
+                  const payoutUsd = ethToUsd(payoutEth);
+                  const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${cVal} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+                  await ctx.telegram.sendMessage(chatA, summary);
+                  if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
+                  await mp.settlePvpGame(ctx, ch.id, winnerUserId);
+                }
+              }, 4000);
+            } else {
+              const winnerUserId = creatorRoll > opponentRoll ? userAId : userBId;
+              const payoutEth = ch.wager * 2;
+              const payoutUsd = ethToUsd(payoutEth);
+              const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${creatorRoll} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+              await ctx.telegram.sendMessage(chatA, summary);
+              if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
+              await mp.settlePvpGame(ctx, ch.id, winnerUserId);
+            }
+          }, 4000);
+        }
       } else if (ch.game === 'Bowling') {
         const intro = `🎳 PvP Bowling: ${getUserDisplayFromUserPlain(creatorUser)} vs ${getUserDisplayFromUserPlain(opponentUser)}! Rolling for both players...`;
         await ctx.telegram.sendMessage(chatA, intro);
+        if (groupChatId) {
+          await ctx.telegram.sendMessage(groupChatId, `[${creatorUser.username}](tg://user?id=${creatorUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
+          const creatorRollMsg = await ctx.telegram.sendDice(groupChatId, { emoji: '🎳' });
+          await ctx.telegram.sendMessage(groupChatId, `[${opponentUser.username}](tg://user?id=${opponentUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
+          const opponentRollMsg = await ctx.telegram.sendDice(groupChatId, { emoji: '🎳' });
+          const creatorTelegramVal = creatorRollMsg.dice?.value || 1;
+          const opponentTelegramVal = opponentRollMsg.dice?.value || 1;
 
-        const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎳' });
-        const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎳' });
-        const creatorTelegramVal = creatorRollMsg.dice?.value || 1;
-        const opponentTelegramVal = opponentRollMsg.dice?.value || 1;
+          const mapPins = (v: number) => ({ 1:0, 2:3, 3:5, 4:7, 5:9, 6:10 } as Record<number, number>)[v] || 0;
+          const creatorPins = mapPins(creatorTelegramVal);
+          const opponentPins = mapPins(opponentTelegramVal);
 
-        const mapPins = (v: number) => ({ 1:0, 2:3, 3:5, 4:7, 5:9, 6:10 } as Record<number, number>)[v] || 0;
-        const creatorPins = mapPins(creatorTelegramVal);
-        const opponentPins = mapPins(opponentTelegramVal);
-
-        setTimeout(async () => {
-          if (creatorPins === opponentPins) {
-            // Tie -> reroll up to 5 times; if still tied declare draw
-            let tries = 0;
-            let cPins = creatorPins;
-            let oPins = opponentPins;
-            while (tries < 5 && cPins === oPins) {
-              const tieNote = `🤝 Tie (${cPins} vs ${oPins})! Rerolling...`;
-              await ctx.telegram.sendMessage(chatA, tieNote);
-              if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
-              const cMsg2 = await ctx.telegram.sendDice(chatA, { emoji: '🎳' });
-              const oMsg2 = await ctx.telegram.sendDice(chatB, { emoji: '🎳' });
-              cPins = mapPins(cMsg2.dice?.value || 1);
-              oPins = mapPins(oMsg2.dice?.value || 1);
-              tries++;
-            }
-            setTimeout(async () => {
-              if (cPins === oPins) {
-                const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
-                await ctx.telegram.sendMessage(chatA, drawMsg);
-                if (!groupChatId) await ctx.telegram.sendMessage(chatB, drawMsg);
-                await mp.completeDraw(ch.id);
-              } else {
-                const winnerUserId = cPins > oPins ? userAId : userBId;
-                const payoutEth = ch.wager * 2;
-                const payoutUsd = ethToUsd(payoutEth);
-                const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${cPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${oPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
-                await ctx.telegram.sendMessage(chatA, summary);
-                if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
-                await mp.settlePvpGame(ctx, ch.id, winnerUserId);
+          setTimeout(async () => {
+            if (creatorPins === opponentPins) {
+              // Tie -> reroll up to 5 times; if still tied declare draw
+              let tries = 0;
+              let cPins = creatorPins;
+              let oPins = opponentPins;
+              while (tries < 5 && cPins === oPins) {
+                const tieNote = `🤝 Tie (${cPins} vs ${oPins})! Rerolling...`;
+                await ctx.telegram.sendMessage(groupChatId, tieNote);
+                if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
+                const cMsg2 = await ctx.telegram.sendDice(groupChatId, { emoji: '🎳' });
+                const oMsg2 = await ctx.telegram.sendDice(groupChatId, { emoji: '🎳' });
+                cPins = mapPins(cMsg2.dice?.value || 1);
+                oPins = mapPins(oMsg2.dice?.value || 1);
+                tries++;
               }
-            }, 4000);
-          } else {
-            const winnerUserId = creatorPins > opponentPins ? userAId : userBId;
-            const payoutEth = ch.wager * 2;
-            const payoutUsd = ethToUsd(payoutEth);
-            const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
-            await ctx.telegram.sendMessage(chatA, summary);
-            if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
-            await mp.settlePvpGame(ctx, ch.id, winnerUserId);
-          }
-        }, 4000);
+              setTimeout(async () => {
+                if (cPins === oPins) {
+                  const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
+                  await ctx.telegram.sendMessage(groupChatId, drawMsg);
+                  if (!groupChatId) await ctx.telegram.sendMessage(chatB, drawMsg);
+                  await mp.completeDraw(ch.id);
+                } else {
+                  const winnerUserId = cPins > oPins ? userAId : userBId;
+                  const payoutEth = ch.wager * 2;
+                  const payoutUsd = ethToUsd(payoutEth);
+                  const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${cPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${oPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+                  await ctx.telegram.sendMessage(groupChatId, summary);
+                  if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
+                  await mp.settlePvpGame(ctx, ch.id, winnerUserId);
+                }
+              }, 4000);
+            } else {
+              const winnerUserId = creatorPins > opponentPins ? userAId : userBId;
+              const payoutEth = ch.wager * 2;
+              const payoutUsd = ethToUsd(payoutEth);
+              const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+              await ctx.telegram.sendMessage(groupChatId, summary);
+              if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
+              await mp.settlePvpGame(ctx, ch.id, winnerUserId);
+            }
+          }, 4000);
+        } else {
+          const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎳' });
+          const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎳' });
+          const creatorTelegramVal = creatorRollMsg.dice?.value || 1;
+          const opponentTelegramVal = opponentRollMsg.dice?.value || 1;
+
+          const mapPins = (v: number) => ({ 1:0, 2:3, 3:5, 4:7, 5:9, 6:10 } as Record<number, number>)[v] || 0;
+          const creatorPins = mapPins(creatorTelegramVal);
+          const opponentPins = mapPins(opponentTelegramVal);
+
+          setTimeout(async () => {
+            if (creatorPins === opponentPins) {
+              // Tie -> reroll up to 5 times; if still tied declare draw
+              let tries = 0;
+              let cPins = creatorPins;
+              let oPins = opponentPins;
+              while (tries < 5 && cPins === oPins) {
+                const tieNote = `🤝 Tie (${cPins} vs ${oPins})! Rerolling...`;
+                await ctx.telegram.sendMessage(chatA, tieNote);
+                if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
+                const cMsg2 = await ctx.telegram.sendDice(chatA, { emoji: '🎳' });
+                const oMsg2 = await ctx.telegram.sendDice(chatB, { emoji: '🎳' });
+                cPins = mapPins(cMsg2.dice?.value || 1);
+                oPins = mapPins(oMsg2.dice?.value || 1);
+                tries++;
+              }
+              setTimeout(async () => {
+                if (cPins === oPins) {
+                  const drawMsg = `🤝 Draw after ${tries+1} rolls! No payout. Your wagers are returned.`;
+                  await ctx.telegram.sendMessage(chatA, drawMsg);
+                  if (!groupChatId) await ctx.telegram.sendMessage(chatB, drawMsg);
+                  await mp.completeDraw(ch.id);
+                } else {
+                  const winnerUserId = cPins > oPins ? userAId : userBId;
+                  const payoutEth = ch.wager * 2;
+                  const payoutUsd = ethToUsd(payoutEth);
+                  const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+                  await ctx.telegram.sendMessage(chatA, summary);
+                  if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
+                  await mp.settlePvpGame(ctx, ch.id, winnerUserId);
+                }
+              }, 4000);
+            } else {
+              const winnerUserId = creatorPins > opponentPins ? userAId : userBId;
+              const payoutEth = ch.wager * 2;
+              const payoutUsd = ethToUsd(payoutEth);
+              const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+              await ctx.telegram.sendMessage(chatA, summary);
+              if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
+              await mp.settlePvpGame(ctx, ch.id, winnerUserId);
+            }
+          }, 4000);
+        }
       } else if (ch.game === 'Coinflip') {
-        const intro = `🪙 PvP Coinflip! ${getUserDisplayFromUserPlain(creatorUser)} = HEADS, ${getUserDisplayFromUserPlain(opponentUser)} = TAILS. Flipping...`;
-        await ctx.telegram.sendMessage(chatA, intro);
+        // Single animation for both users in group
+        const intro = `🪙 PvP Coinflip! [${creatorUser.username}](tg://user?id=${creatorUser.telegramId}) = HEADS, [${opponentUser.username}](tg://user?id=${opponentUser.telegramId}) = TAILS. Flipping...`;
+        if (groupChatId) {
+          await ctx.telegram.sendMessage(groupChatId, intro, { parse_mode: 'Markdown' });
+          const flipMsg = await ctx.telegram.sendMessage(groupChatId, '🪙');
+          const coinStates = ['🪙', '🪙'];
+          for (let i = 0; i < coinStates.length; i++) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            try {
+              await ctx.telegram.editMessageText(groupChatId, flipMsg.message_id, undefined, coinStates[i]);
+            } catch (e) {}
+          }
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+          // Private chats: show animation to both users separately
+          const introA = `🪙 You are HEADS, [${creatorUser.username}](tg://user?id=${creatorUser.telegramId})! Flipping...`;
+          const introB = `🪙 You are TAILS, [${opponentUser.username}](tg://user?id=${opponentUser.telegramId})! Flipping...`;
+          await ctx.telegram.sendMessage(chatA, introA, { parse_mode: 'Markdown' });
+          const flipMsgA = await ctx.telegram.sendMessage(chatA, '🪙');
+          const coinStates = ['🪙', '🪙'];
+          for (let i = 0; i < coinStates.length; i++) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            try {
+              await ctx.telegram.editMessageText(chatA, flipMsgA.message_id, undefined, coinStates[i]);
+            } catch (e) {}
+          }
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await ctx.telegram.sendMessage(chatB, introB, { parse_mode: 'Markdown' });
+          const flipMsgB = await ctx.telegram.sendMessage(chatB, '🪙');
+          for (let i = 0; i < coinStates.length; i++) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            try {
+              await ctx.telegram.editMessageText(chatB, flipMsgB.message_id, undefined, coinStates[i]);
+            } catch (e) {}
+          }
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
         // Animate simple flip
         const resultIsHeads = Math.random() < 0.5;
         const resultText = resultIsHeads ? 'HEADS' : 'TAILS';
@@ -329,7 +471,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
         const payoutEth = ch.wager * 2;
         const payoutUsd = ethToUsd(payoutEth);
         const summary = `Result: ${resultText}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
-        await ctx.telegram.sendMessage(chatA, summary);
+        await ctx.telegram.sendMessage(groupChatId || chatA, summary);
         if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
         await mp.settlePvpGame(ctx, ch.id, winnerUserId);
       }
