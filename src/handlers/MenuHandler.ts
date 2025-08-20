@@ -18,10 +18,12 @@ export class MenuHandler {
   }
 
   async handleStart(ctx: Context): Promise<void> {
-    const user = await this.userService.getOrCreateUser(ctx);
+    // Always fetch the latest user from DB to get the most up-to-date balance
+    const userFromSession = await this.userService.getOrCreateUser(ctx);
+    const user = await this.userService.refreshUserBalance(userFromSession.id) || userFromSession;
     const uid = ctx.from?.id;
     const userDisplay = getUserDisplay(ctx);
-
+    
     // Convert ETH balance to USD for display
     const balanceUsd = ethToUsd(user.balance);
 

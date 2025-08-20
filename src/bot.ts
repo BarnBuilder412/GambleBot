@@ -350,6 +350,10 @@ bot.action('cancel_withdraw', async (ctx) => {
   await walletHandler.handleCancelWithdraw(ctx);
 });
 
+bot.action('deposit_chain_eth_sepolia', async (ctx) => {
+  await walletHandler.handleDepositChainEthSepolia(ctx);
+});
+
 // Listen for text input (wager, withdrawal address, withdrawal amount)
 bot.on('text', async (ctx) => {
   if (ctx.message && 'text' in ctx.message) {

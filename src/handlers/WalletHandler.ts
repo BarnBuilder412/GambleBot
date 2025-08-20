@@ -18,17 +18,27 @@ export class WalletHandler {
 
   async handleDeposit(ctx: Context): Promise<void> {
     await ctx.answerCbQuery();
+    // Show supported chains menu
+    await ctx.reply(
+      'Select a chain for deposit:',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('Ethereum Sepolia', 'deposit_chain_eth_sepolia')],
+        [Markup.button.callback('🔙 Back', `main_menu_u${ctx.from?.id}`)]
+      ])
+    );
+  }
+
+  async handleDepositChainEthSepolia(ctx: Context): Promise<void> {
+    await ctx.answerCbQuery();
     const user = await this.userService.getOrCreateUser(ctx);
     const depositAddress = await this.blockchain.ensureDepositAddress(user);
     const qrCodeDataUrl = await qrcode.toDataURL(depositAddress);
     const base64Data = qrCodeDataUrl.replace(/^data:image\/png;base64,/, "");
-
     const buffer = Buffer.from(base64Data, "base64");
     const chatType = ctx.chat?.type;
     const userId = ctx.from?.id;
     if ((chatType === 'group' || chatType === 'supergroup') && userId) {
       try {
-        // await ctx.reply("🔐 I've sent your deposit address in a private message.");
         await ctx.telegram.sendPhoto(
           userId,
           { source: buffer },
@@ -228,7 +238,7 @@ export class WalletHandler {
       ctx.session.withdrawAddress = undefined;
 
       await ctx.reply(
-        formatUserMessage(ctx,`✅ **Withdrawal Submitted**\n\n💰 Amount: $${amount.toFixed(2)}\n📍 To address: ${address}\n🔗 Tx: ${tx.hash}\n\n💳 New balance: $${(user.balance - amount).toFixed(2)}`),
+        formatUserMessage(ctx,`✅ **Withdrawal Submitted**\n\n💰 Amount: $${amount.toFixed(2)}\n📍 To address: ${address}\n🔗 Tx: ${tx.hash}\n\n💳 New balance: $${(user.balance).toFixed(2)}`),
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
