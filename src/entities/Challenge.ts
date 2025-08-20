@@ -8,7 +8,7 @@ import {
 } from "typeorm";
 import { User } from "./User";
 
-export type ChallengeStatus = "open" | "accepted" | "cancelled" | "completed";
+export type ChallengeStatus = "open" | "accepted" | "cancelled" | "completed" | "error";
 
 @Entity()
 export class Challenge {

@@ -43,9 +43,9 @@ export class GameManager {
 
     const user = await this.userService.getOrCreateUser(ctx);
     // Removed balance check for testing
-    // if (!await this.userService.hasEnoughBalance(user, wager)) {
-    //   return { success: false, message: 'Insufficient balance for this wager.' };
-    // }
+    if (!await this.userService.hasEnoughBalance(user, wager)) {
+      return { success: false, message: 'Insufficient balance for this wager.' };
+    }
 
     // Store wager in session
     ctx.session.wager = wager;
@@ -61,24 +61,28 @@ export class GameManager {
 
     const user = await this.userService.getOrCreateUser(ctx);
     
-    // Removed balance check for testing
-    // if (!await this.userService.hasEnoughBalance(user, ctx.session.wager)) {
-    //   return { success: false, message: 'Insufficient balance for this wager.' };
-    // }
-
-    // Deduct wager
-    await this.userService.updateBalance(user, -ctx.session.wager, TransactionType.BET, 'Dice wager');
-
-    // Use the existing Dice game class
-    const diceGame = this.games.Dice;
-    const result = await diceGame.play(user, ctx.session.wager, AppDataSource, diceValue);
-
-    // Add winnings if any
-    if (result.winAmount > 0) {
-      await this.userService.updateBalance(user, result.winAmount, TransactionType.WIN, 'Dice win');
+    // CRITICAL: Safe balance deduction with comprehensive checks
+    const deductResult = await this.userService.deductBalance(user, ctx.session.wager, TransactionType.BET, 'Dice wager');
+    if (!deductResult.success) {
+      return { success: false, message: `❌ ${deductResult.error}` };
     }
 
-    return { success: true, message: result.message, winAmount: result.winAmount };
+    try {
+      // Use the existing Dice game class
+      const diceGame = this.games.Dice;
+      const result = await diceGame.play(user, ctx.session.wager, AppDataSource, diceValue);
+
+      // Add winnings if any
+      if (result.winAmount > 0) {
+        await this.userService.updateBalance(user, result.winAmount, TransactionType.WIN, 'Dice win');
+      }
+
+      return { success: true, message: result.message, winAmount: result.winAmount };
+    } catch (error) {
+      // If game fails after deduction, refund the wager
+      await this.userService.updateBalance(user, ctx.session.wager, TransactionType.REFUND, 'Dice game error refund');
+      return { success: false, message: 'Game error occurred. Wager refunded.' };
+    }
   }
 
   async playCoinflip(ctx: Context, guess: "heads" | "tails"): Promise<{ success: boolean; message: string; winAmount?: number }> {
@@ -88,24 +92,28 @@ export class GameManager {
 
     const user = await this.userService.getOrCreateUser(ctx);
     
-    // Removed balance check for testing
-    // if (!await this.userService.hasEnoughBalance(user, ctx.session.wager)) {
-    //   return { success: false, message: 'Insufficient balance for this wager.' };
-    // }
-
-    // Deduct wager
-    await this.userService.updateBalance(user, -ctx.session.wager, TransactionType.BET, 'Coinflip wager');
-
-    // Use the existing Coinflip game class
-    const coinflipGame = this.games.Coinflip;
-    const result = await coinflipGame.play(user, ctx.session.wager, AppDataSource, guess);
-
-    // Add winnings if any
-    if (result.winAmount > 0) {
-      await this.userService.updateBalance(user, result.winAmount, TransactionType.WIN, 'Coinflip win');
+    // CRITICAL: Safe balance deduction with comprehensive checks
+    const deductResult = await this.userService.deductBalance(user, ctx.session.wager, TransactionType.BET, 'Coinflip wager');
+    if (!deductResult.success) {
+      return { success: false, message: `❌ ${deductResult.error}` };
     }
 
-    return { success: true, message: result.message, winAmount: result.winAmount };
+    try {
+      // Use the existing Coinflip game class
+      const coinflipGame = this.games.Coinflip;
+      const result = await coinflipGame.play(user, ctx.session.wager, AppDataSource, guess);
+
+      // Add winnings if any
+      if (result.winAmount > 0) {
+        await this.userService.updateBalance(user, result.winAmount, TransactionType.WIN, 'Coinflip win');
+      }
+
+      return { success: true, message: result.message, winAmount: result.winAmount };
+    } catch (error) {
+      // If game fails after deduction, refund the wager
+      await this.userService.updateBalance(user, ctx.session.wager, TransactionType.REFUND, 'Coinflip game error refund');
+      return { success: false, message: 'Game error occurred. Wager refunded.' };
+    }
   }
 
   async playBowling(ctx: Context, bowlingValue?: number): Promise<{ success: boolean; message: string; winAmount?: number }> {
@@ -115,24 +123,28 @@ export class GameManager {
 
     const user = await this.userService.getOrCreateUser(ctx);
     
-    // Removed balance check for testing
-    // if (!await this.userService.hasEnoughBalance(user, ctx.session.wager)) {
-    //   return { success: false, message: 'Insufficient balance for this wager.' };
-    // }
-
-    // Deduct wager
-    await this.userService.updateBalance(user, -ctx.session.wager, TransactionType.BET, 'Bowling wager');
-
-    // Use the existing Bowling game class with bowling value from animation
-    const bowlingGame = this.games.Bowling;
-    const result = await bowlingGame.play(user, ctx.session.wager, AppDataSource, bowlingValue);
-
-    // Add winnings if any
-    if (result.winAmount > 0) {
-      await this.userService.updateBalance(user, result.winAmount, TransactionType.WIN, 'Bowling win');
+    // CRITICAL: Safe balance deduction with comprehensive checks
+    const deductResult = await this.userService.deductBalance(user, ctx.session.wager, TransactionType.BET, 'Bowling wager');
+    if (!deductResult.success) {
+      return { success: false, message: `❌ ${deductResult.error}` };
     }
 
-    return { success: true, message: result.message, winAmount: result.winAmount };
+    try {
+      // Use the existing Bowling game class with bowling value from animation
+      const bowlingGame = this.games.Bowling;
+      const result = await bowlingGame.play(user, ctx.session.wager, AppDataSource, bowlingValue);
+
+      // Add winnings if any
+      if (result.winAmount > 0) {
+        await this.userService.updateBalance(user, result.winAmount, TransactionType.WIN, 'Bowling win');
+      }
+
+      return { success: true, message: result.message, winAmount: result.winAmount };
+    } catch (error) {
+      // If game fails after deduction, refund the wager
+      await this.userService.updateBalance(user, ctx.session.wager, TransactionType.REFUND, 'Bowling game error refund');
+      return { success: false, message: 'Game error occurred. Wager refunded.' };
+    }
   }
 
   clearSession(ctx: Context): void {

@@ -32,9 +32,13 @@ export class UserService {
     type: TransactionType,
     description?: string
   ): Promise<void> {
-    user.balance += amount;
-    // Removed insufficient balance check for testing
-    // if (user.balance < -0.01) throw new Error("Insufficient balance.");
+    // CRITICAL: Prevent negative balance
+    const newBalance = user.balance + amount;
+    if (newBalance < 0) {
+      throw new Error(`Insufficient balance. Current: ${user.balance.toFixed(6)} ETH, Required: ${Math.abs(amount).toFixed(6)} ETH`);
+    }
+
+    user.balance = newBalance;
 
     const tx = new Transaction();
     tx.user = user;
@@ -51,7 +55,42 @@ export class UserService {
   }
 
   async hasEnoughBalance(user: User, amount: number): Promise<boolean> {
-    return user.balance >= amount;
+    // Refresh user balance from database to ensure accuracy
+    const freshUser = await this.refreshUserBalance(user.id);
+    if (!freshUser) return false;
+    
+    // Update the user object with fresh balance
+    user.balance = freshUser.balance;
+    
+    return user.balance >= amount && amount > 0;
+  }
+
+  /**
+   * Safely deduct balance with comprehensive checks
+   */
+  async deductBalance(
+    user: User,
+    amount: number,
+    type: TransactionType,
+    description?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Double-check balance before deduction
+      if (!await this.hasEnoughBalance(user, amount)) {
+        return {
+          success: false,
+          error: `Insufficient balance. Current: ${user.balance.toFixed(6)} ETH, Required: ${amount.toFixed(6)} ETH`
+        };
+      }
+
+      await this.updateBalance(user, -amount, type, description);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Balance deduction failed'
+      };
+    }
   }
 
   async refreshUserBalance(userId: number): Promise<User | null> {
