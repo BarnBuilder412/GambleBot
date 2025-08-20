@@ -2,6 +2,7 @@
 import { BaseGame } from "./BaseGame";
 import { User } from "../entities/User";
 import { DataSource } from "typeorm";
+import { ethToUsd, formatUsd } from "../utils/currency";
 
 export class Bowling extends BaseGame {
   name(): string {
@@ -30,14 +31,16 @@ export class Bowling extends BaseGame {
     if (actualPins === 10) {
       // Strike (10 pins) → payout x3
       winAmount = wager * 3;
-      message = `Win\nPayout: $${winAmount.toFixed(2)}. Pins Down: ${actualPins}`;
+      const winAmountUsd = ethToUsd(winAmount);
+      message = `🎳 STRIKE! Win!\nPayout: ${formatUsd(winAmountUsd)}. Pins Down: ${actualPins}`;
     } else if (actualPins >= 7 && actualPins <= 9) {
       // 7-9 pins → payout x1.5
       winAmount = wager * 1.5;
-      message = `Win\nPayout: $${winAmount.toFixed(2)}. Pins Down: ${actualPins}`;
+      const winAmountUsd = ethToUsd(winAmount);
+      message = `🎉 Great Roll! Win!\nPayout: ${formatUsd(winAmountUsd)}. Pins Down: ${actualPins}`;
     } else {
       // 0-6 pins → loss
-      message = `Lose\nPayout: $0. Pins Down: ${actualPins}`;
+      message = `😔 Poor Roll - Lose\nPayout: $0.00. Pins Down: ${actualPins}`;
     }
 
     return { message, winAmount };

@@ -4,6 +4,7 @@ import { UserService } from "../services/UserService";
 import { GameManager } from "../services/GameManager";
 import { MultiplayerService } from "../services/MultiplayerService";
 import { formatUserMessage, getUserDisplay } from "../utils/userDisplay";
+import { usdToEth, ethToUsd, formatUsd, formatEth } from "../utils/currency";
 
 export class MenuHandler {
   private userService: UserService;
@@ -21,8 +22,11 @@ export class MenuHandler {
     const uid = ctx.from?.id;
     const userDisplay = getUserDisplay(ctx);
 
+    // Convert ETH balance to USD for display
+    const balanceUsd = ethToUsd(user.balance);
+
     await ctx.reply(
-      `Welcome, ${userDisplay}!\nBalance: ${user.balance.toFixed(4)} $`,
+      `Welcome, ${userDisplay}!\nBalance: ${formatUsd(balanceUsd)} (${formatEth(user.balance)})`,
       Markup.inlineKeyboard([
         [Markup.button.callback("🎲 Play", `play_u${uid}`)],
         [Markup.button.callback("💰 Deposit Address", `deposit_u${uid}`)],
@@ -106,8 +110,11 @@ export class MenuHandler {
     const user = await this.userService.getOrCreateUser(ctx);
     const currentHandle = getUserDisplay(ctx);
     
+    // Convert ETH balance to USD for display
+    const balanceUsd = ethToUsd(user.balance);
+    
     await ctx.reply(
-      `⚙️ **Settings**\n\n👤 Current Handle: ${currentHandle}\n💰 Balance: ${user.balance.toFixed(4)} $\n📍 Deposit Address: \`${user.depositAddress}\``,
+      `⚙️ **Settings**\n\n👤 Current Handle: ${currentHandle}\n💰 Balance: ${formatUsd(balanceUsd)} (${formatEth(user.balance)})\n📍 Deposit Address: \`${user.depositAddress}\``,
       { parse_mode: "Markdown" }
     );
   }
@@ -210,20 +217,23 @@ Good luck! 🍀`;
   async handleWagerSelection(ctx: Context, gameName: string, wagerAmount: string): Promise<void> {
     await ctx.answerCbQuery();
     
-    let wager: number;
+    let wagerEth: number;
+    let wagerUsd: number;
     
     // Handle balance-based wagering
     if (wagerAmount === 'half' || wagerAmount === 'full') {
       const user = await this.userService.getOrCreateUser(ctx);
       
       if (wagerAmount === 'half') {
-        wager = user.balance / 2;
+        wagerEth = user.balance / 2;
       } else { // full
-        wager = user.balance;
+        wagerEth = user.balance;
       }
       
+      wagerUsd = ethToUsd(wagerEth);
+      
       // Check if user has sufficient balance
-      if (wager <= 0) {
+      if (wagerEth <= 0) {
         await ctx.reply(
           "❌ **Insufficient Balance**\n\nYou don't have enough funds to place this wager.\n\nPlease make a deposit first!",
           { parse_mode: "Markdown" }
@@ -231,15 +241,28 @@ Good luck! 🍀`;
         return;
       }
     } else {
-      wager = parseFloat(wagerAmount);
+      // Convert USD wager to ETH for internal use
+      wagerUsd = parseFloat(wagerAmount);
+      wagerEth = usdToEth(wagerUsd);
+      
+      // Check if user has sufficient balance in ETH
+      const user = await this.userService.getOrCreateUser(ctx);
+      if (user.balance < wagerEth) {
+        const userBalanceUsd = ethToUsd(user.balance);
+        await ctx.reply(
+          `❌ **Insufficient Balance**\n\nWager: ${formatUsd(wagerUsd)}\nYour Balance: ${formatUsd(userBalanceUsd)}\n\nPlease deposit more funds or choose a smaller wager.`,
+          { parse_mode: "Markdown" }
+        );
+        return;
+      }
     }
     
     ctx.session.game = gameName;
-    ctx.session.wager = wager;
+    ctx.session.wager = wagerEth; // Store ETH amount for game logic
     const uid = ctx.from?.id;
     
     await ctx.reply(
-      formatUserMessage(ctx, `✅ Wager set: ${wager} $ for ${gameName}\n\nChoose how to play:`),
+      formatUserMessage(ctx, `✅ Wager set: ${formatUsd(wagerUsd)} (${formatEth(wagerEth)}) for ${gameName}\n\nChoose how to play:`),
       Markup.inlineKeyboard([
         [
           Markup.button.callback('🤖 Play vs Bot', `pve_${gameName}_u${uid}`),
@@ -323,8 +346,9 @@ Good luck! 🍀`;
       return;
     }
     const challenge = await this.multiplayer.createChallenge(ctx, gameName, wager);
+    const wagerDisplayUsd = ethToUsd(wager);
     await ctx.reply(
-      formatUserMessage(ctx, `📣 Challenge created for ${gameName} at ${wager} ETH!\nChallenge #${challenge.id}. Waiting for an opponent...`),
+      formatUserMessage(ctx, `📣 Challenge created for ${gameName} at ${formatUsd(wagerDisplayUsd)}!\nChallenge #${challenge.id}. Waiting for an opponent...`),
       Markup.inlineKeyboard([
         [Markup.button.callback('🗒 View Open Challenges', `pvp_list_${gameName}`)],
         [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
@@ -340,12 +364,15 @@ Good luck! 🍀`;
       await ctx.reply(`No open challenges for ${gameName} yet. Create one!`);
       return;
     }
-    const rows = open.slice(0, 10).map((c) => [
-      Markup.button.callback(
-        `#${c.id} by @${c.creator.username || c.creator.telegramId} • ${c.wager} ETH`,
-        `pvp_accept_${c.id}`
-      )
-    ]);
+    const rows = open.slice(0, 10).map((c) => {
+      const wagerUsd = ethToUsd(c.wager);
+      return [
+        Markup.button.callback(
+          `#${c.id} by @${c.creator.username || c.creator.telegramId} • ${formatUsd(wagerUsd)}`,
+          `pvp_accept_${c.id}`
+        )
+      ];
+    });
     rows.push([Markup.button.callback('🔙 Back', `play_u${uid}`)]);
     await ctx.reply(
       `Open challenges for ${gameName}:`,
