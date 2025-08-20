@@ -5,6 +5,7 @@ import { blockchainService } from "../services/BlockchainService";
 import { TransactionType } from "../entities/Transaction";
 import * as qrcode from "qrcode";
 import { isAddress } from "ethers";
+import { sendWithdrawal } from "../blockchain/withdraw";
 
 export class WalletHandler {
   private userService: UserService;
@@ -215,15 +216,18 @@ export class WalletHandler {
     const address = ctx.session.withdrawAddress!;
 
     try {
-      // Deduct amount from user balance
-      await this.userService.updateBalance(user, -amount, TransactionType.WITHDRAW, `Withdrawal to ${address}`);
+      // Submit on-chain withdrawal first
+      const tx = await sendWithdrawal(address, amount);
+
+      // Deduct amount from user balance upon successful submission
+      await this.userService.updateBalance(user, -amount, TransactionType.WITHDRAW, `Withdrawal to ${address} (tx: ${tx.hash})`);
 
       // Clear withdrawal session
       ctx.session.withdrawStep = undefined;
       ctx.session.withdrawAddress = undefined;
 
       await ctx.reply(
-        `✅ **Withdrawal Processed**\n\n💰 Amount: $${amount.toFixed(2)}\n📍 To address: ${address}\n\n💳 New balance: $${(user.balance - amount).toFixed(2)}\n\n⏳ Your withdrawal will be processed within 24 hours.`,
+        `✅ **Withdrawal Submitted**\n\n💰 Amount: $${amount.toFixed(2)}\n📍 To address: ${address}\n🔗 Tx: ${tx.hash}\n\n💳 New balance: $${(user.balance - amount).toFixed(2)}`,
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
@@ -234,7 +238,7 @@ export class WalletHandler {
 
     } catch (error) {
       await ctx.reply(
-        "❌ **Withdrawal Failed**\n\nThere was an error processing your withdrawal. Please try again later.",
+        "❌ **Withdrawal Failed**\n\nThere was an error submitting your withdrawal. Please try again later.",
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([

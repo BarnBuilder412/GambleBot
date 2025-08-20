@@ -14,6 +14,10 @@ export function getProvider(): ethers.JsonRpcProvider {
 export const DERIVATION_PATH_PREFIX = process.env.DERIVATION_PATH_PREFIX || "m/44'/60'/0'/0";
 export const HD_WALLET_MNEMONIC = process.env.HD_WALLET_MNEMONIC || '';
 export const TREASURY_ADDRESS = process.env.TREASURY_ADDRESS || '';
+export const TREASURY_PRIVATE_KEY = process.env.TREASURY_PRIVATE_KEY || '';
+export const TREASURY_DERIVATION_INDEX = process.env.TREASURY_DERIVATION_INDEX
+  ? Number(process.env.TREASURY_DERIVATION_INDEX)
+  : 0;
 
 export const MAX_FEE_GWEI = Number(process.env.MAX_FEE_GWEI || 0);
 export const MAX_PRIORITY_FEE_GWEI = Number(process.env.MAX_PRIORITY_FEE_GWEI || 0);
