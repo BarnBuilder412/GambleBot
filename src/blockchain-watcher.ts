@@ -2,6 +2,7 @@
 import * as dotenv from 'dotenv';
 import { AppDataSource } from './utils/db';
 import { blockchainService } from './services/BlockchainService';
+import { WATCHER_SYNC_MS } from './blockchain/config';
 
 dotenv.config();
 
@@ -20,7 +21,17 @@ async function startWatcher() {
     blockchainService.startWatcher();
     
     console.log('✅ Blockchain Watcher Service is running!');
+    console.log(`🔁 Syncing new addresses every ${WATCHER_SYNC_MS}ms`);
     console.log('💡 Press Ctrl+C to stop');
+
+    // Periodically sync new addresses so new users are auto-watched
+    setInterval(async () => {
+      try {
+        await blockchainService.syncNewAddresses();
+      } catch (e) {
+        console.error('❌ Address sync failed:', e);
+      }
+    }, WATCHER_SYNC_MS);
     
   } catch (error) {
     console.error('❌ Failed to start blockchain watcher:', error);

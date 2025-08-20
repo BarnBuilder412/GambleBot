@@ -24,6 +24,7 @@ export const MAX_PRIORITY_FEE_GWEI = Number(process.env.MAX_PRIORITY_FEE_GWEI ||
 export const MIN_SWEEP_WEI = BigInt(process.env.MIN_SWEEP_WEI || '0');
 export const DEPOSIT_CONFIRMATIONS = Number(process.env.DEPOSIT_CONFIRMATIONS || 2);
 export const WATCH_MODE = (process.env.WATCH_MODE || 'transactions').toLowerCase(); // 'transactions' | 'balances'
+export const WATCHER_SYNC_MS = Number(process.env.WATCHER_SYNC_MS || 5000);
 
 export function getFeeOverridesOrNull(): Partial<ethers.TransactionRequest> | null {
   if (MAX_FEE_GWEI > 0 && MAX_PRIORITY_FEE_GWEI > 0) {

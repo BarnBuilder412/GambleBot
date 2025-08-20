@@ -9,6 +9,7 @@ export class BlockchainService {
   private watchedAddresses = new Set<string>();
   private stopFn: (() => void) | null = null;
   private processedTxHashes = new Set<string>(); // Prevent duplicate processing
+  private lastSyncedCount = 0;
 
   async ensureDepositAddress(user: User): Promise<string> {
     if (user.depositAddress) {
@@ -44,7 +45,28 @@ export class BlockchainService {
       }
     }
     
+    this.lastSyncedCount = this.watchedAddresses.size;
     console.log(`📡 Watching ${this.watchedAddresses.size} deposit addresses for incoming transactions`);
+  }
+
+  async syncNewAddresses() {
+    // Pull any new addresses added since last sync
+    const repo = AppDataSource.getRepository(User);
+    const usersWithAddresses = await repo.createQueryBuilder('user')
+      .select(['user.depositAddress'])
+      .where('user.depositAddress IS NOT NULL')
+      .getMany();
+
+    let added = 0;
+    for (const user of usersWithAddresses) {
+      if (user.depositAddress && !this.watchedAddresses.has(user.depositAddress.toLowerCase())) {
+        this.watchAddress(user.depositAddress);
+        added++;
+      }
+    }
+    if (added > 0) {
+      console.log(`🆕 Added ${added} new deposit addresses to watcher (total: ${this.watchedAddresses.size})`);
+    }
   }
 
   startWatcher() {
