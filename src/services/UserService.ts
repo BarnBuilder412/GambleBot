@@ -53,4 +53,22 @@ export class UserService {
   async hasEnoughBalance(user: User, amount: number): Promise<boolean> {
     return user.balance >= amount;
   }
+
+  async refreshUserBalance(userId: number): Promise<User | null> {
+    // Refresh user from database to get latest balance
+    const repo = AppDataSource.getRepository(User);
+    return await repo.findOneBy({ id: userId });
+  }
+
+  async getUserTransactionHistory(telegramId: number, limit: number = 10): Promise<Transaction[]> {
+    const user = await AppDataSource.getRepository(User).findOneBy({ telegramId });
+    if (!user) return [];
+
+    return await AppDataSource.getRepository(Transaction)
+      .find({
+        where: { user: { id: user.id } },
+        order: { createdAt: 'DESC' },
+        take: limit
+      });
+  }
 } 

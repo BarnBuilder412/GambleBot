@@ -10,6 +10,7 @@ import { GameManager } from "./services/GameManager";
 import { MenuHandler } from "./handlers/MenuHandler";
 import { WalletHandler } from "./handlers/WalletHandler";
 import { GameHandler } from "./handlers/GameHandler";
+import { blockchainService } from "./services/BlockchainService";
 
 dotenv.config();
 
@@ -382,9 +383,19 @@ bot.action(/coinflip_tails_u(\d+)/, async (ctx) => {
 
 // Launch bot
 bot.launch()
-  .then(() => {
+  .then(async () => {
     console.log(`🎰 GambleBot is running!`);
     console.log('🚀 Bot is ready to accept users!');
+    
+    // Initialize database connection
+    if (!AppDataSource.isInitialized) {
+      await AppDataSource.initialize();
+      console.log('📊 Database connection established');
+    }
+    
+    // Load existing deposit addresses and start blockchain watcher
+    await blockchainService.loadExistingAddresses();
+    blockchainService.startWatcher();
   })
   .catch((err) => {
     console.error('❌ Failed to start bot:', err);

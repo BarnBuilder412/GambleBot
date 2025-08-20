@@ -1,12 +1,14 @@
 // src/handlers/WalletHandler.ts
 import { Context, Markup } from "telegraf";
 import { UserService } from "../services/UserService";
+import { blockchainService } from "../services/BlockchainService";
 import { TransactionType } from "../entities/Transaction";
 import * as qrcode from "qrcode";
 import { isAddress } from "ethers";
 
 export class WalletHandler {
   private userService: UserService;
+  private blockchain = blockchainService;
 
   constructor(userService: UserService) {
     this.userService = userService;
@@ -15,9 +17,7 @@ export class WalletHandler {
   async handleDeposit(ctx: Context): Promise<void> {
     await ctx.answerCbQuery();
     const user = await this.userService.getOrCreateUser(ctx);
-
-    // Generate QR code and send deposit address
-    const depositAddress = user.depositAddress!;
+    const depositAddress = await this.blockchain.ensureDepositAddress(user);
     const qrCodeDataUrl = await qrcode.toDataURL(depositAddress);
     const base64Data = qrCodeDataUrl.replace(/^data:image\/png;base64,/, "");
 
