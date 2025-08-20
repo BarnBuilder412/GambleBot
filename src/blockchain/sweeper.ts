@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import { getProvider, TREASURY_ADDRESS, getFeeOverridesOrNull, MIN_SWEEP_WEI } from './config';
 
-export async function sweepFromDerived(wallets: ethers.Wallet[], destination?: string) {
+export async function sweepFromDerived(wallets: (ethers.Wallet | ethers.HDNodeWallet)[], destination?: string) {
   const provider = getProvider();
   const to = destination || TREASURY_ADDRESS;
   if (!to) throw new Error('Destination address or TREASURY_ADDRESS is required');

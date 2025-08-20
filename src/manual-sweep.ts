@@ -30,7 +30,7 @@ async function manualSweep() {
     console.log(`🔍 Checking balances for ${users.length} addresses...\n`);
 
     const provider = getProvider();
-    const addressesToSweep: { user: User; wallet: ethers.Wallet; balance: bigint }[] = [];
+    const addressesToSweep: { user: User; wallet: ethers.HDNodeWallet; balance: bigint }[] = [];
 
     // Check balances
     for (const user of users) {
