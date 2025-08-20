@@ -9,3 +9,4 @@ dist
 .env.development
 .env.test
 .env.production
+BOTFATHER_SETUP.md

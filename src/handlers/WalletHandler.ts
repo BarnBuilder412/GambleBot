@@ -1,13 +1,16 @@
 // src/handlers/WalletHandler.ts
 import { Context, Markup } from "telegraf";
 import { UserService } from "../services/UserService";
+import { blockchainService } from "../services/BlockchainService";
 import { TransactionType } from "../entities/Transaction";
 import { formatUserMessage, getUserDisplay } from "../utils/userDisplay";
 import * as qrcode from "qrcode";
 import { isAddress } from "ethers";
+import { sendWithdrawal } from "../blockchain/withdraw";
 
 export class WalletHandler {
   private userService: UserService;
+  private blockchain = blockchainService;
 
   constructor(userService: UserService) {
     this.userService = userService;
@@ -16,9 +19,7 @@ export class WalletHandler {
   async handleDeposit(ctx: Context): Promise<void> {
     await ctx.answerCbQuery();
     const user = await this.userService.getOrCreateUser(ctx);
-
-    // Generate QR code and send deposit address
-    const depositAddress = user.depositAddress!;
+    const depositAddress = await this.blockchain.ensureDepositAddress(user);
     const qrCodeDataUrl = await qrcode.toDataURL(depositAddress);
     const base64Data = qrCodeDataUrl.replace(/^data:image\/png;base64,/, "");
 
@@ -216,15 +217,18 @@ export class WalletHandler {
     const address = ctx.session.withdrawAddress!;
 
     try {
-      // Deduct amount from user balance
-      await this.userService.updateBalance(user, -amount, TransactionType.WITHDRAW, `Withdrawal to ${address}`);
+      // Submit on-chain withdrawal first
+      const tx = await sendWithdrawal(address, amount);
+
+      // Deduct amount from user balance upon successful submission
+      await this.userService.updateBalance(user, -amount, TransactionType.WITHDRAW, `Withdrawal to ${address} (tx: ${tx.hash})`);
 
       // Clear withdrawal session
       ctx.session.withdrawStep = undefined;
       ctx.session.withdrawAddress = undefined;
 
       await ctx.reply(
-        formatUserMessage(ctx, `✅ **Withdrawal Processed**\n\n💰 Amount: $${amount.toFixed(2)}\n📍 To address: ${address}\n\n💳 New balance: $${(user.balance - amount).toFixed(2)}\n\n⏳ Your withdrawal will be processed within 24 hours.`),
+        formatUserMessage(ctx,`✅ **Withdrawal Submitted**\n\n💰 Amount: $${amount.toFixed(2)}\n📍 To address: ${address}\n🔗 Tx: ${tx.hash}\n\n💳 New balance: $${(user.balance - amount).toFixed(2)}`),
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
@@ -235,7 +239,7 @@ export class WalletHandler {
 
     } catch (error) {
       await ctx.reply(
-        formatUserMessage(ctx, "❌ **Withdrawal Failed**\n\nThere was an error processing your withdrawal. Please try again later."),
+        "❌ **Withdrawal Failed**\n\nThere was an error processing your withdrawal. Please try again later.",
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([

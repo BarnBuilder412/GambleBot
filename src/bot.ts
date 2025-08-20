@@ -10,8 +10,8 @@ import { GameManager } from "./services/GameManager";
 import { MenuHandler } from "./handlers/MenuHandler";
 import { WalletHandler } from "./handlers/WalletHandler";
 import { GameHandler } from "./handlers/GameHandler";
-import { getUserDisplayFromUser, getUserDisplayFromUserPlain } from "./utils/userDisplay";
-import { formatUserMessage, getUserDisplay } from "./utils/userDisplay";
+import { getUserDisplayFromUserPlain } from "./utils/userDisplay";
+import { formatUserMessage } from "./utils/userDisplay";
 
 dotenv.config();
 
