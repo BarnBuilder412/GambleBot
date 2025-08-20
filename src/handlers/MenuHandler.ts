@@ -19,9 +19,10 @@ export class MenuHandler {
   async handleStart(ctx: Context): Promise<void> {
     const user = await this.userService.getOrCreateUser(ctx);
     const uid = ctx.from?.id;
+    const userDisplay = getUserDisplay(ctx);
 
     await ctx.reply(
-      `Welcome, ${ctx.from?.first_name}!\nBalance: ${user.balance.toFixed(4)} $`,
+      `Welcome, ${userDisplay}!\nBalance: ${user.balance.toFixed(4)} $`,
       Markup.inlineKeyboard([
         [Markup.button.callback("🎲 Play", `play_u${uid}`)],
         [Markup.button.callback("💰 Deposit Address", `deposit_u${uid}`)],
@@ -37,7 +38,7 @@ export class MenuHandler {
     const uid = ctx.from?.id;
     
     await ctx.reply(
-      "Choose a game:",
+      formatUserMessage(ctx, "Choose a game:"),
       Markup.inlineKeyboard(
         games.map((g) => Markup.button.callback(g, `game_${g}_u${uid}`))
       )
@@ -103,10 +104,11 @@ export class MenuHandler {
   async handleSettings(ctx: Context): Promise<void> {
     await ctx.answerCbQuery();
     const user = await this.userService.getOrCreateUser(ctx);
+    const currentHandle = getUserDisplay(ctx);
     
     await ctx.reply(
-      `Settings:\nUsername: ${user.username}\nBalance: ${user.balance.toFixed(4)} $\nDeposit Address: \`${user.depositAddress}\``,
-      { parse_mode: "MarkdownV2" }
+      `⚙️ **Settings**\n\n👤 Current Handle: ${currentHandle}\n💰 Balance: ${user.balance.toFixed(4)} $\n📍 Deposit Address: \`${user.depositAddress}\``,
+      { parse_mode: "Markdown" }
     );
   }
 

@@ -30,14 +30,14 @@ export class Bowling extends BaseGame {
     if (actualPins === 10) {
       // Strike (10 pins) → payout x3
       winAmount = wager * 3;
-      message = `Win\nPayout: $${winAmount.toFixed(2)}`;
+      message = `Win\nPayout: $${winAmount.toFixed(2)}. Down Pins: ${this.getBowlingVisual(actualPins)}`;
     } else if (actualPins >= 7 && actualPins <= 9) {
       // 7-9 pins → payout x1.5
       winAmount = wager * 1.5;
-      message = `Win\nPayout: $${winAmount.toFixed(2)}`;
+      message = `Win\nPayout: $${winAmount.toFixed(2)}. Down Pins: ${this.getBowlingVisual(actualPins)}`;
     } else {
       // 0-6 pins → loss
-      message = `Lose\nPayout: $0`;
+      message = `Lose\nPayout: $0. Down Pins: ${this.getBowlingVisual(actualPins)}`;
     }
 
     return { message, winAmount };

@@ -32,14 +32,15 @@ export class GameHandler {
             // Play the game with the actual dice value
             const diceResult = await this.gameManager.playDice(ctx, diceValue);
             if (diceResult.success) {
+              const uid = ctx.from?.id;
               await ctx.reply(
                 formatUserMessage(ctx, diceResult.message),
                 Markup.inlineKeyboard([
                   [
-                    Markup.button.callback('🎲 Play Dice Again', 'play_again_Dice'),
-                    Markup.button.callback('🎮 Other Games', 'play')
+                    Markup.button.callback('🎲 Play Dice Again', `play_again_Dice_u${uid}`),
+                    Markup.button.callback('🎮 Other Games', `play_u${uid}`)
                   ],
-                  [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+                  [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
                 ])
               );
             } else {
@@ -51,12 +52,13 @@ export class GameHandler {
         
         case 'Coinflip':
           ctx.session.awaitingGuess = true;
+          const uid = ctx.from?.id;
           await ctx.reply(
             formatUserMessage(ctx, 'Choose your side:'),
             Markup.inlineKeyboard([
               [
-                Markup.button.callback('🪙 Heads', 'coinflip_heads'),
-                Markup.button.callback('🪙 Tails', 'coinflip_tails')
+                Markup.button.callback('🪙 Heads', `coinflip_heads_u${uid}`),
+                Markup.button.callback('🪙 Tails', `coinflip_tails_u${uid}`)
               ]
             ])
           );
@@ -72,14 +74,15 @@ export class GameHandler {
             // Play the game with the actual bowling value
             const bowlingResult = await this.gameManager.playBowling(ctx, bowlingValue);
             if (bowlingResult.success) {
+              const uid = ctx.from?.id;
               await ctx.reply(
                 formatUserMessage(ctx, bowlingResult.message),
                 Markup.inlineKeyboard([
                   [
-                    Markup.button.callback('🎳 Play Bowling Again', 'play_again_Bowling'),
-                    Markup.button.callback('🎮 Other Games', 'play')
+                    Markup.button.callback('🎳 Play Bowling Again', `play_again_Bowling_u${uid}`),
+                    Markup.button.callback('🎮 Other Games', `play_u${uid}`)
                   ],
-                  [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+                  [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
                 ])
               );
             } else {
@@ -143,10 +146,10 @@ export class GameHandler {
       formatUserMessage(ctx, result.message),
       Markup.inlineKeyboard([
         [
-          Markup.button.callback('🪙 Play Coinflip Again', 'play_again_Coinflip'),
-          Markup.button.callback('🎮 Other Games', 'play')
+          Markup.button.callback('🪙 Play Coinflip Again', `play_again_Coinflip_u${ctx.from?.id}`),
+          Markup.button.callback('🎮 Other Games', `play_u${ctx.from?.id}`)
         ],
-        [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+        [Markup.button.callback('🏠 Main Menu', `main_menu_u${ctx.from?.id}`)]
       ])
     );
     this.gameManager.clearSession(ctx); // Reset session for next game

@@ -59,7 +59,7 @@ export class WalletHandler {
         // await ctx.reply("🔐 I've sent you a private message to start your withdrawal.");
         await ctx.telegram.sendMessage(
           userId,
-          '💰 Withdraw ETH\n\nPress the button below to start your private withdrawal flow:',
+          '💰 Withdraw $\n\nPress the button below to start your private withdrawal flow:',
           Markup.inlineKeyboard([[Markup.button.callback('▶️ Start Withdrawal', `start_withdraw_u${userId}`)]] as any)
         );
       } catch (e) {
@@ -205,7 +205,7 @@ export class WalletHandler {
       {
         parse_mode: "Markdown",
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+          [Markup.button.callback('🏠 Main Menu', `main_menu_u${ctx.from?.id}`)]
         ])
       }
     );
@@ -228,7 +228,7 @@ export class WalletHandler {
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+            [Markup.button.callback('🏠 Main Menu', `main_menu_u${ctx.from?.id}`)]
           ])
         }
       );
@@ -239,7 +239,7 @@ export class WalletHandler {
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('🏠 Main Menu', 'main_menu')]
+            [Markup.button.callback('🏠 Main Menu', `main_menu_u${ctx.from?.id}`)]
           ])
         }
       );

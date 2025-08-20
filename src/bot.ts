@@ -245,7 +245,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
                 await mp.completeDraw(ch.id);
               } else {
                 const winnerUserId = cVal > oVal ? userAId : userBId;
-                const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${cVal} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+                const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${cVal} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} $`;
                 await ctx.telegram.sendMessage(chatA, summary);
                 if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
                 await mp.settlePvpGame(ctx, ch.id, winnerUserId);
@@ -253,7 +253,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
             }, 4000);
           } else {
             const winnerUserId = creatorRoll > opponentRoll ? userAId : userBId;
-            const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${creatorRoll} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+            const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${creatorRoll} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} $`;
             await ctx.telegram.sendMessage(chatA, summary);
             if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
             await mp.settlePvpGame(ctx, ch.id, winnerUserId);
@@ -296,7 +296,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
                 await mp.completeDraw(ch.id);
               } else {
                 const winnerUserId = cPins > oPins ? userAId : userBId;
-                const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${cPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${oPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+                const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${cPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${oPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} $`;
                 await ctx.telegram.sendMessage(chatA, summary);
                 if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
                 await mp.settlePvpGame(ctx, ch.id, winnerUserId);
@@ -304,7 +304,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
             }, 4000);
           } else {
             const winnerUserId = creatorPins > opponentPins ? userAId : userBId;
-            const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+            const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} $`;
             await ctx.telegram.sendMessage(chatA, summary);
             if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
             await mp.settlePvpGame(ctx, ch.id, winnerUserId);
@@ -317,7 +317,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
         const resultIsHeads = Math.random() < 0.5;
         const resultText = resultIsHeads ? 'HEADS' : 'TAILS';
         const winnerUserId = resultIsHeads ? userAId : userBId;
-        const summary = `Result: ${resultText}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} ETH`;
+        const summary = `Result: ${resultText}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${(ch.wager*2).toFixed(4)} $`;
         await ctx.telegram.sendMessage(chatA, summary);
         if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
         await mp.settlePvpGame(ctx, ch.id, winnerUserId);
