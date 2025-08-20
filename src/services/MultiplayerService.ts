@@ -4,6 +4,7 @@ import { AppDataSource } from "../utils/db";
 import { Challenge } from "../entities/Challenge";
 import { UserService } from "./UserService";
 import { TransactionType } from "../entities/Transaction";
+import { ethToUsd, formatUsd } from "../utils/currency";
 
 export class MultiplayerService {
   constructor(private readonly userService: UserService) {}
@@ -13,7 +14,9 @@ export class MultiplayerService {
 
     // CRITICAL: Check if user has enough balance to create challenge
     if (!await this.userService.hasEnoughBalance(user, wager)) {
-      throw new Error(`Insufficient balance to create challenge. Required: ${wager.toFixed(6)} ETH, Available: ${user.balance.toFixed(6)} ETH`);
+      const requiredUsd = ethToUsd(wager);
+      const availableUsd = ethToUsd(user.balance);
+      throw new Error(`Insufficient balance to create challenge. Required: ${formatUsd(requiredUsd)}, Available: ${formatUsd(availableUsd)}`);
     }
 
     const repo = AppDataSource.getRepository(Challenge);
@@ -59,7 +62,9 @@ export class MultiplayerService {
     }
 
     if (!opponentHasBalance) {
-      return { ok: false, message: `Insufficient balance to accept challenge. Required: ${challenge.wager.toFixed(6)} ETH, Available: ${user.balance.toFixed(6)} ETH` };
+      const requiredUsd = ethToUsd(challenge.wager);
+      const availableUsd = ethToUsd(user.balance);
+      return { ok: false, message: `Insufficient balance to accept challenge. Required: ${formatUsd(requiredUsd)}, Available: ${formatUsd(availableUsd)}` };
     }
 
     challenge.opponent = user;

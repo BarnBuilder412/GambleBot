@@ -4,6 +4,7 @@ import { AppDataSource } from "../utils/db";
 import { User } from "../entities/User";
 import { Transaction, TransactionType } from "../entities/Transaction";
 import { generateDepositAddress } from "../utils/wallet";
+import { ethToUsd, formatUsd } from "../utils/currency";
 
 export class UserService {
   async getOrCreateUser(ctx: Context): Promise<User> {
@@ -35,7 +36,9 @@ export class UserService {
     // CRITICAL: Prevent negative balance
     const newBalance = user.balance + amount;
     if (newBalance < 0) {
-      throw new Error(`Insufficient balance. Current: ${user.balance.toFixed(6)} ETH, Required: ${Math.abs(amount).toFixed(6)} ETH`);
+      const currentUsd = ethToUsd(user.balance);
+      const requiredUsd = ethToUsd(Math.abs(amount));
+      throw new Error(`Insufficient balance. Current: ${formatUsd(currentUsd)}, Required: ${formatUsd(requiredUsd)}`);
     }
 
     user.balance = newBalance;
@@ -77,9 +80,11 @@ export class UserService {
     try {
       // Double-check balance before deduction
       if (!await this.hasEnoughBalance(user, amount)) {
+        const currentUsd = ethToUsd(user.balance);
+        const requiredUsd = ethToUsd(amount);
         return {
           success: false,
-          error: `Insufficient balance. Current: ${user.balance.toFixed(6)} ETH, Required: ${amount.toFixed(6)} ETH`
+          error: `Insufficient balance. Current: ${formatUsd(currentUsd)}, Required: ${formatUsd(requiredUsd)}`
         };
       }
 
