@@ -87,21 +87,34 @@ export class MultiplayerService {
       const creatorDeduct = await this.userService.deductBalance(creator, challenge.wager, TransactionType.BET, `${challenge.game} PvP wager`);
       const opponentDeduct = await this.userService.deductBalance(opponent, challenge.wager, TransactionType.BET, `${challenge.game} PvP wager`);
 
-      if (!creatorDeduct.success || !opponentDeduct.success) {
-        // If either deduction fails, refund any successful deduction and cancel
-        if (creatorDeduct.success) {
-          await this.userService.updateBalance(creator, challenge.wager, TransactionType.REFUND, `${challenge.game} PvP refund - opponent insufficient balance`);
-        }
-        if (opponentDeduct.success) {
-          await this.userService.updateBalance(opponent, challenge.wager, TransactionType.REFUND, `${challenge.game} PvP refund - creator insufficient balance`);
-        }
-        
+      // Handle different failure scenarios based on your requirements
+      if (!creatorDeduct.success && !opponentDeduct.success) {
+        // Both lack balance - cancel challenge
         challenge.status = "cancelled";
         await repo.save(challenge);
         return;
       }
+      
+      if (!creatorDeduct.success) {
+        // Creator lacks balance - refund opponent if deducted, cancel challenge
+        if (opponentDeduct.success) {
+          await this.userService.updateBalance(opponent, challenge.wager, TransactionType.REFUND, `${challenge.game} PvP refund - creator insufficient balance`);
+        }
+        challenge.status = "cancelled";
+        await repo.save(challenge);
+        return;
+      }
+      
+      if (!opponentDeduct.success) {
+        // Opponent lacks balance - refund creator, reset challenge to open for others to accept
+        await this.userService.updateBalance(creator, challenge.wager, TransactionType.REFUND, `${challenge.game} PvP refund - opponent insufficient balance`);
+        challenge.status = "open";
+        challenge.opponent = null; // Remove opponent so others can accept
+        await repo.save(challenge);
+        return;
+      }
 
-      // Award winnings to winner
+      // Both deductions successful - award winnings to winner
       const winner = creator.telegramId === winnerTelegramId ? creator : opponent;
       await this.userService.updateBalance(winner, totalPot, TransactionType.WIN, `${challenge.game} PvP win`);
 
@@ -122,5 +135,6 @@ export class MultiplayerService {
     await repo.save(challenge);
   }
 }
+
 
 
