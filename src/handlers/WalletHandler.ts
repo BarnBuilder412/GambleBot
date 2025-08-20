@@ -2,6 +2,7 @@
 import { Context, Markup } from "telegraf";
 import { UserService } from "../services/UserService";
 import { TransactionType } from "../entities/Transaction";
+import { formatUserMessage, getUserDisplay } from "../utils/userDisplay";
 import * as qrcode from "qrcode";
 import { isAddress } from "ethers";
 
@@ -223,7 +224,7 @@ export class WalletHandler {
       ctx.session.withdrawAddress = undefined;
 
       await ctx.reply(
-        `✅ **Withdrawal Processed**\n\n💰 Amount: $${amount.toFixed(2)}\n📍 To address: ${address}\n\n💳 New balance: $${(user.balance - amount).toFixed(2)}\n\n⏳ Your withdrawal will be processed within 24 hours.`,
+        formatUserMessage(ctx, `✅ **Withdrawal Processed**\n\n💰 Amount: $${amount.toFixed(2)}\n📍 To address: ${address}\n\n💳 New balance: $${(user.balance - amount).toFixed(2)}\n\n⏳ Your withdrawal will be processed within 24 hours.`),
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
@@ -234,7 +235,7 @@ export class WalletHandler {
 
     } catch (error) {
       await ctx.reply(
-        "❌ **Withdrawal Failed**\n\nThere was an error processing your withdrawal. Please try again later.",
+        formatUserMessage(ctx, "❌ **Withdrawal Failed**\n\nThere was an error processing your withdrawal. Please try again later."),
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([

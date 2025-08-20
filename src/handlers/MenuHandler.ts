@@ -3,6 +3,7 @@ import { Context, Markup } from "telegraf";
 import { UserService } from "../services/UserService";
 import { GameManager } from "../services/GameManager";
 import { MultiplayerService } from "../services/MultiplayerService";
+import { formatUserMessage, getUserDisplay } from "../utils/userDisplay";
 
 export class MenuHandler {
   private userService: UserService;
@@ -48,7 +49,7 @@ export class MenuHandler {
     const uid = ctx.from?.id;
     
     if (!this.gameManager.isValidGame(gameName)) {
-      await ctx.reply("Invalid game selected.");
+      await ctx.reply(formatUserMessage(ctx, "Invalid game selected."));
       return;
     }
 
@@ -91,7 +92,7 @@ export class MenuHandler {
     ]);
 
     await ctx.reply(
-      `🎮 **${gameName} Game Selected!**\n\n💰 Choose your wager amount:`,
+      formatUserMessage(ctx, `🎮 **${gameName} Game Selected!**\n\n💰 Choose your wager amount:`),
       {
         parse_mode: "Markdown",
         ...Markup.inlineKeyboard(wagerButtons)
@@ -236,7 +237,7 @@ Good luck! 🍀`;
     const uid = ctx.from?.id;
     
     await ctx.reply(
-      `✅ Wager set: ${wager} ETH for ${gameName}\n\nChoose how to play:`,
+      formatUserMessage(ctx, `✅ Wager set: ${wager} $ for ${gameName}\n\nChoose how to play:`),
       Markup.inlineKeyboard([
         [
           Markup.button.callback('🤖 Play vs Bot', `pve_${gameName}_u${uid}`),
@@ -253,7 +254,7 @@ Good luck! 🍀`;
     const wager = ctx.session.wager;
     const uid = ctx.from?.id;
     if (!wager) {
-      await ctx.reply("Please pick a wager first.");
+      await ctx.reply(formatUserMessage(ctx, "Please pick a wager first."));
       return;
     }
     switch (gameName) {
@@ -263,16 +264,15 @@ Good luck! 🍀`;
         setTimeout(async () => {
           const diceResult = await this.gameManager.playDice(ctx, diceValue);
           if (diceResult.success) {
-            const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'Player';
             await ctx.reply(
-              `${username} ${diceResult.message}`,
+              formatUserMessage(ctx, diceResult.message),
               Markup.inlineKeyboard([
                 [Markup.button.callback('🎲 Play Dice Again', `play_again_Dice_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
                 [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
               ])
             );
           } else {
-            await ctx.reply(diceResult.message);
+            await ctx.reply(formatUserMessage(ctx, diceResult.message));
           }
           this.gameManager.clearSession(ctx);
         }, 4000);
@@ -281,7 +281,7 @@ Good luck! 🍀`;
       case 'Coinflip': {
         ctx.session.awaitingGuess = true;
         await ctx.reply(
-          '🪙 **Coinflip Game Ready!**\n\nChoose your side:',
+          formatUserMessage(ctx, '🪙 **Coinflip Game Ready!**\n\nChoose your side:'),
           {
             parse_mode: "Markdown",
             ...Markup.inlineKeyboard([[Markup.button.callback('🪙 Heads', `coinflip_heads_u${uid}`), Markup.button.callback('🪙 Tails', `coinflip_tails_u${uid}`)]])
@@ -295,16 +295,15 @@ Good luck! 🍀`;
         setTimeout(async () => {
           const bowlingResult = await this.gameManager.playBowling(ctx, bowlingValue);
           if (bowlingResult.success) {
-            const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'Player';
             await ctx.reply(
-              `${username} ${bowlingResult.message}`,
+              formatUserMessage(ctx, bowlingResult.message),
               Markup.inlineKeyboard([
                 [Markup.button.callback('🎳 Play Bowling Again', `play_again_Bowling_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
                 [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
               ])
             );
           } else {
-            await ctx.reply(bowlingResult.message);
+            await ctx.reply(formatUserMessage(ctx, bowlingResult.message));
           }
           this.gameManager.clearSession(ctx);
         }, 4000);
@@ -318,12 +317,12 @@ Good luck! 🍀`;
     const wager = ctx.session.wager;
     const uid = ctx.from?.id;
     if (!wager) {
-      await ctx.reply("Please pick a wager first.");
+      await ctx.reply(formatUserMessage(ctx, "Please pick a wager first."));
       return;
     }
     const challenge = await this.multiplayer.createChallenge(ctx, gameName, wager);
     await ctx.reply(
-      `📣 Challenge created for ${gameName} at ${wager} ETH!\nChallenge #${challenge.id}. Waiting for an opponent...`,
+      formatUserMessage(ctx, `📣 Challenge created for ${gameName} at ${wager} ETH!\nChallenge #${challenge.id}. Waiting for an opponent...`),
       Markup.inlineKeyboard([
         [Markup.button.callback('🗒 View Open Challenges', `pvp_list_${gameName}`)],
         [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]

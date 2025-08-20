@@ -1,6 +1,7 @@
 // src/handlers/GameHandler.ts
 import { Context, Markup } from "telegraf";
 import { GameManager } from "../services/GameManager";
+import { formatUserMessage, getUserDisplay } from "../utils/userDisplay";
 
 export class GameHandler {
   private gameManager: GameManager;
@@ -15,7 +16,7 @@ export class GameHandler {
       const result = await this.gameManager.processWager(ctx, ctx.session.game, ctx.message.text);
       
       if (!result.success) {
-        await ctx.reply(result.message!);
+        await ctx.reply(formatUserMessage(ctx, result.message!));
         return true;
       }
 
@@ -31,9 +32,8 @@ export class GameHandler {
             // Play the game with the actual dice value
             const diceResult = await this.gameManager.playDice(ctx, diceValue);
             if (diceResult.success) {
-              const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'Player';
               await ctx.reply(
-                `${username} ${diceResult.message}`,
+                formatUserMessage(ctx, diceResult.message),
                 Markup.inlineKeyboard([
                   [
                     Markup.button.callback('🎲 Play Dice Again', 'play_again_Dice'),
@@ -43,7 +43,7 @@ export class GameHandler {
                 ])
               );
             } else {
-              await ctx.reply(diceResult.message);
+              await ctx.reply(formatUserMessage(ctx, diceResult.message));
             }
             this.gameManager.clearSession(ctx); // Reset session for next game
           }, 4000); // Wait for dice animation
@@ -52,7 +52,7 @@ export class GameHandler {
         case 'Coinflip':
           ctx.session.awaitingGuess = true;
           await ctx.reply(
-            'Choose your side:',
+            formatUserMessage(ctx, 'Choose your side:'),
             Markup.inlineKeyboard([
               [
                 Markup.button.callback('🪙 Heads', 'coinflip_heads'),
@@ -72,9 +72,8 @@ export class GameHandler {
             // Play the game with the actual bowling value
             const bowlingResult = await this.gameManager.playBowling(ctx, bowlingValue);
             if (bowlingResult.success) {
-              const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'Player';
               await ctx.reply(
-                `${username} ${bowlingResult.message}`,
+                formatUserMessage(ctx, bowlingResult.message),
                 Markup.inlineKeyboard([
                   [
                     Markup.button.callback('🎳 Play Bowling Again', 'play_again_Bowling'),
@@ -84,7 +83,7 @@ export class GameHandler {
                 ])
               );
             } else {
-              await ctx.reply(bowlingResult.message);
+              await ctx.reply(formatUserMessage(ctx, bowlingResult.message));
             }
             this.gameManager.clearSession(ctx); // Reset session for next game
           }, 4000); // Wait for bowling animation
@@ -99,7 +98,7 @@ export class GameHandler {
   // Keeping this method for backward compatibility but it won't be used
   async handleDiceGuess(ctx: Context, guess: number): Promise<void> {
     await ctx.answerCbQuery();
-    await ctx.reply("Dice game no longer requires guessing. Please start a new game!");
+    await ctx.reply(formatUserMessage(ctx, "Dice game is now automatic - no guessing needed!"));
     this.gameManager.clearSession(ctx);
   }
 
@@ -107,7 +106,7 @@ export class GameHandler {
     await ctx.answerCbQuery();
     
     // Show coin flipping animation first
-    await ctx.reply(`🪙 You chose **${guess.toUpperCase()}**!\n\nFlipping the coin...`, { parse_mode: "Markdown" });
+    await ctx.reply(formatUserMessage(ctx, `🪙 You chose **${guess.toUpperCase()}**!\n\nFlipping the coin...`), { parse_mode: "Markdown" });
     
     // Create coin flip animation using multiple messages
     const flipAnimation = await ctx.reply("🪙");
@@ -135,14 +134,13 @@ export class GameHandler {
     const result = await this.gameManager.playCoinflip(ctx, guess);
     
     if (!result.success) {
-      await ctx.reply(result.message);
+      await ctx.reply(formatUserMessage(ctx, result.message));
       this.gameManager.clearSession(ctx);
       return;
     }
 
-    const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'Player';
     await ctx.reply(
-      `${username} ${result.message}`,
+      formatUserMessage(ctx, result.message),
       Markup.inlineKeyboard([
         [
           Markup.button.callback('🪙 Play Coinflip Again', 'play_again_Coinflip'),

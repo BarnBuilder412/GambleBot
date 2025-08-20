@@ -10,6 +10,7 @@ import { GameManager } from "./services/GameManager";
 import { MenuHandler } from "./handlers/MenuHandler";
 import { WalletHandler } from "./handlers/WalletHandler";
 import { GameHandler } from "./handlers/GameHandler";
+import { formatUserMessage, getUserDisplay } from "./utils/userDisplay";
 
 dotenv.config();
 
@@ -189,7 +190,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
     const mp = new MultiplayerService(new UserService());
     const res = await mp.acceptChallenge(ctx, challengeId);
     await ctx.answerCbQuery();
-    await ctx.reply(res.message);
+    await ctx.reply(formatUserMessage(ctx, res.message));
     if (res.ok) {
       // Start the PvP game flow with both players' actions visible
       const { AppDataSource } = await import('./utils/db');
