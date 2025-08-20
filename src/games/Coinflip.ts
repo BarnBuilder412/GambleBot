@@ -28,9 +28,9 @@ export class Coinflip extends BaseGame {
     
     if (guess === result) {
       winAmount = wager * 2;
-      message = `Win\nPayout: $${winAmount.toFixed(2)}`;
+      message = `Win\nPayout: $${winAmount.toFixed(2)}. Result: ${result}`;
     } else {
-      message = `Lose\nPayout: $0`;
+      message = `Lose\nPayout: $0. Result: ${result}`;
     }
 
     return { message, winAmount };
