@@ -23,7 +23,7 @@ export class MenuHandler {
     const user = await this.userService.refreshUserBalance(userFromSession.id) || userFromSession;
     const uid = ctx.from?.id;
     const userDisplay = getUserDisplay(ctx);
-    
+
     // Convert ETH balance to USD for display
     const balanceUsd = ethToUsd(user.balance);
 
@@ -109,7 +109,8 @@ export class MenuHandler {
 
   async handleSettings(ctx: Context): Promise<void> {
     await ctx.answerCbQuery();
-    const user = await this.userService.getOrCreateUser(ctx);
+    const userFromSession = await this.userService.getOrCreateUser(ctx);
+    const user = await this.userService.refreshUserBalance(userFromSession.id) || userFromSession;
     const currentHandle = getUserDisplay(ctx);
     
     // Convert ETH balance to USD for display
