@@ -327,9 +327,26 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
           const creatorTelegramVal = creatorRollMsg.dice?.value || 1;
           const opponentTelegramVal = opponentRollMsg.dice?.value || 1;
 
-          const mapPins = (v: number) => ({ 1:0, 2:3, 3:5, 4:7, 5:9, 6:10 } as Record<number, number>)[v] || 0;
+          // Use the same mapping as Bowling.ts (0-6 pins)
+          const mapPins = (v: number) => {
+            const mapping = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 };
+            return mapping[v as keyof typeof mapping] || 0;
+          };
           const creatorPins = mapPins(creatorTelegramVal);
           const opponentPins = mapPins(opponentTelegramVal);
+
+          // Use the same payout logic as Bowling.ts
+          function getPayoutAndMsg(pins: number, wager: number) {
+            if (pins === 6) {
+              const winAmount = wager * 3;
+              return { payout: winAmount, msg: `🎳 STRIKE! Win!\nPayout: ${formatUsd(ethToUsd(winAmount))}. Pins Down: ${pins}` };
+            } else if (pins >= 4 && pins <= 5) {
+              const winAmount = wager * 1.5;
+              return { payout: winAmount, msg: `🎉 Great Roll! Win!\nPayout: ${formatUsd(ethToUsd(winAmount))}. Pins Down: ${pins}` };
+            } else {
+              return { payout: 0, msg: `😔 Poor Roll - Lose\nPayout: $0.00. Pins Down: ${pins}` };
+            }
+          }
 
           setTimeout(async () => {
             if (creatorPins === opponentPins) {
@@ -355,9 +372,13 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
                   await mp.completeDraw(ch.id);
                 } else {
                   const winnerUserId = cPins > oPins ? userAId : userBId;
-                  const payoutEth = ch.wager * 2;
-                  const payoutUsd = ethToUsd(payoutEth);
-                  const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${cPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${oPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+                  const winnerPins = cPins > oPins ? cPins : oPins;
+                  const loserPins = cPins > oPins ? oPins : cPins;
+                  const winnerUser = cPins > oPins ? creatorUser : opponentUser;
+                  const loserUser = cPins > oPins ? opponentUser : creatorUser;
+                  const winnerMsg = getPayoutAndMsg(winnerPins, ch.wager);
+                  const loserMsg = getPayoutAndMsg(loserPins, ch.wager);
+                  const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${cPins}/6 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${oPins}/6\n🏆 Winner: ${getUserDisplayFromUserPlain(winnerUser)}\n${winnerMsg.msg}`;
                   await ctx.telegram.sendMessage(groupChatId, summary);
                   if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
                   await mp.settlePvpGame(ctx, ch.id, winnerUserId);
@@ -365,9 +386,13 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
               }, 4000);
             } else {
               const winnerUserId = creatorPins > opponentPins ? userAId : userBId;
-              const payoutEth = ch.wager * 2;
-              const payoutUsd = ethToUsd(payoutEth);
-              const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+              const winnerPins = creatorPins > opponentPins ? creatorPins : opponentPins;
+              const loserPins = creatorPins > opponentPins ? opponentPins : creatorPins;
+              const winnerUser = creatorPins > opponentPins ? creatorUser : opponentUser;
+              const loserUser = creatorPins > opponentPins ? opponentUser : creatorUser;
+              const winnerMsg = getPayoutAndMsg(winnerPins, ch.wager);
+              const loserMsg = getPayoutAndMsg(loserPins, ch.wager);
+              const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/6 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/6\n🏆 Winner: ${getUserDisplayFromUserPlain(winnerUser)}\n${winnerMsg.msg}`;
               await ctx.telegram.sendMessage(groupChatId, summary);
               if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
               await mp.settlePvpGame(ctx, ch.id, winnerUserId);
@@ -379,9 +404,26 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
           const creatorTelegramVal = creatorRollMsg.dice?.value || 1;
           const opponentTelegramVal = opponentRollMsg.dice?.value || 1;
 
-          const mapPins = (v: number) => ({ 1:0, 2:3, 3:5, 4:7, 5:9, 6:10 } as Record<number, number>)[v] || 0;
+          // Use the same mapping as Bowling.ts (0-6 pins)
+          const mapPins = (v: number) => {
+            const mapping = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 };
+            return mapping[v as keyof typeof mapping] || 0;
+          };
           const creatorPins = mapPins(creatorTelegramVal);
           const opponentPins = mapPins(opponentTelegramVal);
+
+          // Use the same payout logic as Bowling.ts
+          function getPayoutAndMsg(pins: number, wager: number) {
+            if (pins === 6) {
+              const winAmount = wager * 3;
+              return { payout: winAmount, msg: `🎳 STRIKE! Win!\nPayout: ${formatUsd(ethToUsd(winAmount))}. Pins Down: ${pins}` };
+            } else if (pins >= 4 && pins <= 5) {
+              const winAmount = wager * 1.5;
+              return { payout: winAmount, msg: `🎉 Great Roll! Win!\nPayout: ${formatUsd(ethToUsd(winAmount))}. Pins Down: ${pins}` };
+            } else {
+              return { payout: 0, msg: `😔 Poor Roll - Lose\nPayout: $0.00. Pins Down: ${pins}` };
+            }
+          }
 
           setTimeout(async () => {
             if (creatorPins === opponentPins) {
@@ -407,9 +449,13 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
                   await mp.completeDraw(ch.id);
                 } else {
                   const winnerUserId = cPins > oPins ? userAId : userBId;
-                  const payoutEth = ch.wager * 2;
-                  const payoutUsd = ethToUsd(payoutEth);
-                  const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+                  const winnerPins = cPins > oPins ? cPins : oPins;
+                  const loserPins = cPins > oPins ? oPins : cPins;
+                  const winnerUser = cPins > oPins ? creatorUser : opponentUser;
+                  const loserUser = cPins > oPins ? opponentUser : creatorUser;
+                  const winnerMsg = getPayoutAndMsg(winnerPins, ch.wager);
+                  const loserMsg = getPayoutAndMsg(loserPins, ch.wager);
+                  const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/6 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/6\n🏆 Winner: ${getUserDisplayFromUserPlain(winnerUser)}\n${winnerMsg.msg}`;
                   await ctx.telegram.sendMessage(chatA, summary);
                   if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
                   await mp.settlePvpGame(ctx, ch.id, winnerUserId);
@@ -417,9 +463,13 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
               }, 4000);
             } else {
               const winnerUserId = creatorPins > opponentPins ? userAId : userBId;
-              const payoutEth = ch.wager * 2;
-              const payoutUsd = ethToUsd(payoutEth);
-              const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/10 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/10\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
+              const winnerPins = creatorPins > opponentPins ? creatorPins : opponentPins;
+              const loserPins = creatorPins > opponentPins ? opponentPins : creatorPins;
+              const winnerUser = creatorPins > opponentPins ? creatorUser : opponentUser;
+              const loserUser = creatorPins > opponentPins ? opponentUser : creatorUser;
+              const winnerMsg = getPayoutAndMsg(winnerPins, ch.wager);
+              const loserMsg = getPayoutAndMsg(loserPins, ch.wager);
+              const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} knocked ${creatorPins}/6 • ${getUserDisplayFromUserPlain(opponentUser)} knocked ${opponentPins}/6\n🏆 Winner: ${getUserDisplayFromUserPlain(winnerUser)}\n${winnerMsg.msg}`;
               await ctx.telegram.sendMessage(chatA, summary);
               if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
               await mp.settlePvpGame(ctx, ch.id, winnerUserId);
