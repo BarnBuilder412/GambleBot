@@ -28,12 +28,12 @@ export class Bowling extends BaseGame {
     let message = "";
 
     // Apply new betting rules
-    if (actualPins === 10) {
+    if (actualPins === 6) {
       // Strike (10 pins) → payout x3
       winAmount = wager * 3;
       const winAmountUsd = ethToUsd(winAmount);
       message = `🎳 STRIKE! Win!\nPayout: ${formatUsd(winAmountUsd)}. Pins Down: ${actualPins}`;
-    } else if (actualPins >= 7 && actualPins <= 9) {
+    } else if (actualPins >= 4 && actualPins <= 5) {
       // 7-9 pins → payout x1.5
       winAmount = wager * 1.5;
       const winAmountUsd = ethToUsd(winAmount);
@@ -50,12 +50,12 @@ export class Bowling extends BaseGame {
     // Direct mapping from Telegram bowling dice (1-6) to bowling pins (0-10)
     // This ensures consistency between animation and result
     const mapping = {
-      1: 0,  // Gutter ball - no pins
-      2: 3,  // Poor roll - 3 pins
-      3: 5,  // Average roll - 5 pins  
-      4: 7,  // Good roll - 7 pins (wins 1.5x)
-      5: 9,  // Great roll - 9 pins (wins 1.5x)
-      6: 10  // Strike! - all pins (wins 3x)
+      1: 1,  // Gutter ball - no pins
+      2: 2,  // Poor roll - 3 pins
+      3: 3,  // Average roll - 5 pins  
+      4: 4,  // Good roll - 7 pins (wins 1.5x)
+      5: 5,  // Great roll - 9 pins (wins 1.5x)
+      6: 6  // Strike! - all pins (wins 3x)
     };
     
     return mapping[telegramValue as keyof typeof mapping] || 0;
@@ -63,17 +63,13 @@ export class Bowling extends BaseGame {
 
   private getBowlingVisual(pins: number): string {
     const visuals = {
-      0: '🎳 ⚪⚪⚪⚪⚪⚪⚪⚪⚪⚪ (Gutter ball!)',
-      1: '🎳 💥⚪⚪⚪⚪⚪⚪⚪⚪⚪ (1 pin)',
-      2: '🎳 💥💥⚪⚪⚪⚪⚪⚪⚪⚪ (2 pins)',
-      3: '🎳 💥💥💥⚪⚪⚪⚪⚪⚪⚪ (3 pins)',
-      4: '🎳 💥💥💥💥⚪⚪⚪⚪⚪⚪ (4 pins)',
-      5: '🎳 💥💥💥💥💥⚪⚪⚪⚪⚪ (5 pins)',
-      6: '🎳 💥💥💥💥💥💥⚪⚪⚪⚪ (6 pins)',
-      7: '🎳 💥💥💥💥💥💥💥⚪⚪⚪ (7 pins)',
-      8: '🎳 💥💥💥💥💥💥💥💥⚪⚪ (8 pins)',
-      9: '🎳 💥💥💥💥💥💥💥💥💥⚪ (9 pins)',
-      10: '🎳 💥💥💥💥💥💥💥💥💥💥 (STRIKE!)'
+      0: '🎳 ⚪⚪⚪⚪⚪⚪ (Gutter ball!)',
+      1: '🎳 💥⚪⚪⚪⚪⚪ (1 pin)',
+      2: '🎳 💥💥⚪⚪⚪⚪ (2 pins)',
+      3: '🎳 💥💥💥⚪⚪⚪ (3 pins)',
+      4: '🎳 💥💥💥💥⚪⚪ (4 pins)',
+      5: '🎳 💥💥💥💥💥⚪ (5 pins)',
+      6: '🎳 💥💥💥💥💥💥 (STRIKE)'
     };
     
     return visuals[pins as keyof typeof visuals] || visuals[0];

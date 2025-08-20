@@ -161,9 +161,9 @@ Good luck! 🍀`;
 • No guessing required!
 
 🏆 **Winning Conditions:**
-• **STRIKE (10 pins)**: 3x payout
-• **Great Roll (7-9 pins)**: 1.5x payout  
-• **Poor Roll (0-6 pins)**: You lose
+• **STRIKE (6 pins)**: 3x payout
+• **Great Roll (4-5 pins)**: 1.5x payout  
+• **Poor Roll (1-3 pins)**: You lose
 
 💰 **Payouts:**
 • Strike = 3x your wager
@@ -172,17 +172,17 @@ Good luck! 🍀`;
 
 🎮 **Example:**
 • Wager: $50
-• Roll Strike (10 pins) → You win $150!
-• Roll 8 pins → You win $75!
-• Roll 4 pins → You lose your wager
+• Roll Strike (6 pins) → You win $150!
+• Roll 5 pins → You win $75!
+• Roll 2 pins → You lose your wager
 
 🎳 **Pin Mapping:**
-• Animation 6 = 10 pins (Strike! - 3x payout)
-• Animation 5 = 9 pins (Great - 1.5x payout)
-• Animation 4 = 7 pins (Great - 1.5x payout)
-• Animation 3 = 5 pins (Loss)
-• Animation 2 = 3 pins (Loss)
-• Animation 1 = 0 pins (Gutter ball - Loss)
+• Animation 6 = 6 pins (Strike! - 3x payout)
+• Animation 5 = 5 pins (Great - 1.5x payout)
+• Animation 4 = 4 pins (Great - 1.5x payout)
+• Animation 3 = 3 pins (Loss)
+• Animation 2 = 2 pins (Loss)
+• Animation 1 = 1 pin (Loss)
 
 Good luck! 🍀`;
 
@@ -348,15 +348,31 @@ Good luck! 🍀`;
       await ctx.reply(formatUserMessage(ctx, "Please pick a wager first."));
       return;
     }
-    const challenge = await this.multiplayer.createChallenge(ctx, gameName, wager);
-    const wagerDisplayUsd = ethToUsd(wager);
-    await ctx.reply(
-      formatUserMessage(ctx, `📣 Challenge created for ${gameName} at ${formatUsd(wagerDisplayUsd)}!\nChallenge #${challenge.id}. Waiting for an opponent...`),
-      Markup.inlineKeyboard([
-        [Markup.button.callback('🗒 View Open Challenges', `pvp_list_${gameName}`)],
-        [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
-      ])
-    );
+
+    try {
+      const challenge = await this.multiplayer.createChallenge(ctx, gameName, wager);
+      if (!challenge) {
+        await ctx.reply(formatUserMessage(ctx, "❌ Failed to create challenge. Please try again."));
+        return;
+      }
+
+      const wagerDisplayUsd = ethToUsd(wager);
+      await ctx.reply(
+        formatUserMessage(ctx, `📣 Challenge created for ${gameName} at ${formatUsd(wagerDisplayUsd)}!\nChallenge #${challenge.id}. Waiting for an opponent...`),
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🗒 View Open Challenges', `pvp_list_${gameName}`)],
+          [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
+        ])
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      await ctx.reply(
+        formatUserMessage(ctx, `❌ ${errorMessage}`),
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
+        ])
+      );
+    }
   }
 
   async handleListChallenges(ctx: Context, gameName: string): Promise<void> {
