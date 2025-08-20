@@ -232,8 +232,10 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
               while (tries < 5 && cVal === oVal) {
                 const tieNote = `🤝 Tie (${cVal} vs ${oVal})! Rerolling...`;
                 await ctx.telegram.sendMessage(groupChatId, tieNote);
-                if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
+                // Mention both users before reroll
+                await ctx.telegram.sendMessage(groupChatId, `[${creatorUser.username}](tg://user?id=${creatorUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
                 const cMsg = await ctx.telegram.sendDice(groupChatId, { emoji: '🎲' });
+                await ctx.telegram.sendMessage(groupChatId, `[${opponentUser.username}](tg://user?id=${opponentUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
                 const oMsg = await ctx.telegram.sendDice(groupChatId, { emoji: '🎲' });
                 cVal = cMsg.dice?.value || 1;
                 oVal = oMsg.dice?.value || 1;
@@ -282,8 +284,10 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
               while (tries < 5 && cVal === oVal) {
                 const tieNote = `🤝 Tie (${cVal} vs ${oVal})! Rerolling...`;
                 await ctx.telegram.sendMessage(chatA, tieNote);
-                if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
+                // Mention user before reroll
+                await ctx.telegram.sendMessage(chatA, `[${creatorUser.username}](tg://user?id=${creatorUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
                 const cMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎲' });
+                await ctx.telegram.sendMessage(chatB, `[${opponentUser.username}](tg://user?id=${opponentUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
                 const oMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎲' });
                 cVal = cMsg.dice?.value || 1;
                 oVal = oMsg.dice?.value || 1;
@@ -357,8 +361,10 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
               while (tries < 5 && cPins === oPins) {
                 const tieNote = `🤝 Tie (${cPins} vs ${oPins})! Rerolling...`;
                 await ctx.telegram.sendMessage(groupChatId, tieNote);
-                if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
+                // Mention both users before reroll
+                await ctx.telegram.sendMessage(groupChatId, `[${creatorUser.username}](tg://user?id=${creatorUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
                 const cMsg2 = await ctx.telegram.sendDice(groupChatId, { emoji: '🎳' });
+                await ctx.telegram.sendMessage(groupChatId, `[${opponentUser.username}](tg://user?id=${opponentUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
                 const oMsg2 = await ctx.telegram.sendDice(groupChatId, { emoji: '🎳' });
                 cPins = mapPins(cMsg2.dice?.value || 1);
                 oPins = mapPins(oMsg2.dice?.value || 1);
@@ -434,8 +440,10 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
               while (tries < 5 && cPins === oPins) {
                 const tieNote = `🤝 Tie (${cPins} vs ${oPins})! Rerolling...`;
                 await ctx.telegram.sendMessage(chatA, tieNote);
-                if (!groupChatId) await ctx.telegram.sendMessage(chatB, tieNote);
+                // Mention user before reroll
+                await ctx.telegram.sendMessage(chatA, `[${creatorUser.username}](tg://user?id=${creatorUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
                 const cMsg2 = await ctx.telegram.sendDice(chatA, { emoji: '🎳' });
+                await ctx.telegram.sendMessage(chatB, `[${opponentUser.username}](tg://user?id=${opponentUser.telegramId})'s roll:`, { parse_mode: 'Markdown' });
                 const oMsg2 = await ctx.telegram.sendDice(chatB, { emoji: '🎳' });
                 cPins = mapPins(cMsg2.dice?.value || 1);
                 oPins = mapPins(oMsg2.dice?.value || 1);
