@@ -57,22 +57,22 @@ export class MenuHandler {
     // Show wager options and game rules
     const wagerButtons = [
       [
-        Markup.button.callback("$0.10", `wager_${gameName}_0.1`),
-        Markup.button.callback("$0.50", `wager_${gameName}_0.5`),
-        Markup.button.callback("$1", `wager_${gameName}_1`)
+        Markup.button.callback("$0.10", `wager_${gameName}_0.1_u${uid}`),
+        Markup.button.callback("$0.50", `wager_${gameName}_0.5_u${uid}`),
+        Markup.button.callback("$1", `wager_${gameName}_1_u${uid}`)
       ],
       [
-        Markup.button.callback("$5", `wager_${gameName}_5`),
-        Markup.button.callback("$10", `wager_${gameName}_10`),
-        Markup.button.callback("$25", `wager_${gameName}_25`)
+        Markup.button.callback("$5", `wager_${gameName}_5_u${uid}`),
+        Markup.button.callback("$10", `wager_${gameName}_10_u${uid}`),
+        Markup.button.callback("$25", `wager_${gameName}_25_u${uid}`)
       ],
       [
-        Markup.button.callback("$50", `wager_${gameName}_50`),
-        Markup.button.callback("$100", `wager_${gameName}_100`)
+        Markup.button.callback("$50", `wager_${gameName}_50_u${uid}`),
+        Markup.button.callback("$100", `wager_${gameName}_100_u${uid}`)
       ],
       [
-        Markup.button.callback("Half Balance", `wager_${gameName}_half`),
-        Markup.button.callback("Full Balance", `wager_${gameName}_full`)
+        Markup.button.callback("Half Balance", `wager_${gameName}_half_u${uid}`),
+        Markup.button.callback("Full Balance", `wager_${gameName}_full_u${uid}`)
       ]
     ];
 
