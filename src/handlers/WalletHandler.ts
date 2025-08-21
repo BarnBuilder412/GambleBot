@@ -227,8 +227,10 @@ export class WalletHandler {
     const address = ctx.session.withdrawAddress!;
 
     try {
-      // Submit on-chain withdrawal first
-      const tx = await sendWithdrawal(address, amount);
+      // Submit on-chain withdrawal first (USDC, amount in USD)
+      console.log(`[ui] Withdrawal request: user=${user.id} to=${address} amountUsd=${amount}`);
+      const tx = await sendWithdrawal(address, amount, 'eth_sepolia');
+      console.log(`[ui] Withdrawal tx submitted: ${tx.hash}`);
 
       // Deduct amount from user balance upon successful submission
       await this.userService.updateBalance(user, -amount, TransactionType.WITHDRAW, `Withdrawal to ${address} (tx: ${tx.hash})`);
@@ -247,16 +249,11 @@ export class WalletHandler {
         }
       );
 
-    } catch (error) {
-      await ctx.reply(
-        "❌ **Withdrawal Failed**\n\nThere was an error processing your withdrawal. Please try again later.",
-        {
-          parse_mode: "Markdown",
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('🏠 Main Menu', `main_menu_u${ctx.from?.id}`)]
-          ])
-        }
-      );
+    } catch (error: any) {
+      const msg = String(error?.message || error || 'Withdrawal failed');
+      console.error(`[ui] Withdrawal failed: ${msg}`);
+      // Use plain text to avoid Markdown parse errors
+      await ctx.reply(`Withdrawal failed: ${msg}`);
     }
   }
 
