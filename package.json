@@ -7,6 +7,7 @@
     "bot": "ts-node src/bot.ts",
     "watcher": "ts-node src/blockchain-watcher.ts",
     "show-addresses": "node show-addresses.js",
+    "show:index": "node show-address.js",
     "sweep": "ts-node src/manual-sweep.ts",
     "test:swap": "ts-node src/tests/swap-sepolia-test.ts"
   },

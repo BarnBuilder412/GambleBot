@@ -1,7 +1,7 @@
 import { BaseGame } from "./BaseGame";
 import { User } from "../entities/User";
 import { DataSource } from "typeorm";
-import { ethToUsd, formatUsd } from "../utils/currency";
+import { formatUsd } from "../utils/currency";
 
 export class Dice extends BaseGame {
   name(): string {
@@ -21,8 +21,7 @@ export class Dice extends BaseGame {
 
     if (roll! >= 4) {
       winAmount = wager * 2;
-      const winAmountUsd = ethToUsd(winAmount);
-      message = `🎉 Win!\nPayout: ${formatUsd(winAmountUsd)}. Roll: ${roll}`;
+      message = `🎉 Win!\nPayout: ${formatUsd(winAmount)}. Roll: ${roll}`;
     } else {
       message = `😔 Lose\nPayout: $0.00. Roll: ${roll}`;
     }

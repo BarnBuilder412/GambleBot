@@ -100,7 +100,7 @@ export class WalletHandler {
     ctx.session.withdrawStep = 'address';
 
     await ctx.reply(
-      `💰 **Withdraw Funds**\n\nCurrent balance: $${user.balance.toFixed(2)}\n\n🔐 Please enter your Ethereum wallet address:\n\nExample: 0x742d35Cc6634C0532925a3b8D4C2E8e4C7...`,
+      `💰 **Withdraw Funds**\n\nCurrent balance: $${user.balance.toFixed(2)}\n\n🔐 Please enter your wallet address:\n\nExample: 0x742d35Cc6634C0532925a3b8D4C2E8e4C7...`,
       {
         parse_mode: "Markdown",
         ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel Withdrawal', 'cancel_withdraw')]] as any)
@@ -112,7 +112,7 @@ export class WalletHandler {
     // Validate Ethereum address
     if (!this.isValidEthereumAddress(address)) {
       await ctx.reply(
-        "❌ **Invalid Ethereum Address**\n\nPlease enter a valid Ethereum address.\n\nExample: 0x742d35Cc6634C0532925a3b8D4C2E8e4C7...",
+        "❌ **Invalid Address**\n\nPlease enter a valid wallet address.\n\nExample: 0x742d35Cc6634C0532925a3b8D4C2E8e4C7...",
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([

@@ -43,8 +43,6 @@ function buildChainConfigs(): ChainConfig[] {
       swapRouter02: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
       weth: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // Sepolia WETH9
       uniswapV3Factory: '0x0227628f3F023bb0B980b67D528571c95c6DaC1c', // Uniswap V3 Factory
-      // Provide a V2 factory if available on Sepolia; required for direct pair swap
-      // Example placeholder; replace with the correct V2 factory for your deployment
       uniswapV2Factory: '0xF62c03E08ada871A0bEb309762E260a7a6a880E6',
     }, 
     // {

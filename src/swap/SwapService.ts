@@ -180,7 +180,29 @@ export class UniswapV2PairDirectAdapter implements ISwapAdapter {
     const reserveIn = isWethToken0 ? reserve0 : reserve1;
     const reserveOut = isWethToken0 ? reserve1 : reserve0;
     if (reserveIn === 0n || reserveOut === 0n) throw new Error('Pair has no liquidity');
-    const amountInWithFee = params.amountInRaw * 997n;
+    
+    // Determine the effective input amount based on actual balance and gas reserve
+    let amountWethToSend: bigint = params.amountInRaw;
+    let wrapAmount: bigint | null = null;
+    if (params.sellToken === 'NATIVE') {
+      const balance = await provider.getBalance(params.fromAddress);
+      const fee = await provider.getFeeData();
+      const maxFeePerGas = fee.maxFeePerGas ?? 10n * 1_000_000_000n; // fallback 10 gwei
+      // Reserve gas for up to 3 txs (wrap, transfer, swap). Conservative buffer.
+      const gasUnits = 21000n * 3n;
+      const gasReserve = maxFeePerGas * gasUnits;
+      if (balance <= gasReserve) {
+        throw new Error('Insufficient ETH amount to cover gas fees');
+      }
+      // Use the lesser of requested amount and spendable balance
+      const spendable = balance - gasReserve;
+      wrapAmount = params.amountInRaw < spendable ? params.amountInRaw : spendable;
+      if (wrapAmount <= 0n) throw new Error('Insufficient ETH amount to cover gas fees');
+      amountWethToSend = wrapAmount;
+    }
+
+    // Recompute output using the effective input amount
+    const amountInWithFee = amountWethToSend * 997n;
     const numerator = amountInWithFee * reserveOut;
     const denominator = reserveIn * 1000n + amountInWithFee;
     const amountOut = numerator / denominator;
@@ -190,17 +212,13 @@ export class UniswapV2PairDirectAdapter implements ISwapAdapter {
     // 1) If NATIVE, wrap ETH -> WETH by sending to WETH9 deposit()
     const txRequests: ethers.TransactionRequest[] = [];
     if (params.sellToken === 'NATIVE') {
-      // Reserve some ETH for gas fees (3 transactions worth)
-      const gasReserve = 21000n * 2n * 10000000000n; // ~0.00042 ETH at 10 gwei
-      const wrapAmount = params.amountInRaw - gasReserve;
-      if (wrapAmount <= 0n) throw new Error('Insufficient ETH amount to cover gas fees');
-      
       const wethIface = new ethers.Interface(['function deposit() payable']);
-      txRequests.push({ to: weth, data: wethIface.encodeFunctionData('deposit', []), value: wrapAmount });
+      // wrapAmount is set above when sellToken is NATIVE
+      txRequests.push({ to: weth, data: wethIface.encodeFunctionData('deposit', []), value: amountWethToSend });
     }
     // 2) Transfer WETH to pair
     const erc20Iface = new ethers.Interface(['function transfer(address to,uint256 value) returns (bool)']);
-    txRequests.push({ to: weth, data: erc20Iface.encodeFunctionData('transfer', [pairAddr, params.amountInRaw]), value: 0n });
+    txRequests.push({ to: weth, data: erc20Iface.encodeFunctionData('transfer', [pairAddr, amountWethToSend]), value: 0n });
     // 3) Call pair.swap to send USDC to taker
     const amount0Out = isWethToken0 ? 0n : minOut;
     const amount1Out = isWethToken0 ? minOut : 0n;

@@ -2,7 +2,7 @@
 import { BaseGame } from "./BaseGame";
 import { User } from "../entities/User";
 import { DataSource } from "typeorm";
-import { ethToUsd, formatUsd } from "../utils/currency";
+import { formatUsd } from "../utils/currency";
 
 export class Coinflip extends BaseGame {
   name(): string {
@@ -29,8 +29,7 @@ export class Coinflip extends BaseGame {
     
     if (guess === result) {
       winAmount = wager * 2;
-      const winAmountUsd = ethToUsd(winAmount);
-      message = `🎉 Win!\nPayout: ${formatUsd(winAmountUsd)}. Result: ${result}`;
+      message = `🎉 Win!\nPayout: ${formatUsd(winAmount)}. Result: ${result}`;
     } else {
       message = `😔 Lose\nPayout: $0.00. Result: ${result}`;
     }

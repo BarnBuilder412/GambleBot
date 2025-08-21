@@ -12,7 +12,7 @@ import { WalletHandler } from "./handlers/WalletHandler";
 import { GameHandler } from "./handlers/GameHandler";
 import { getUserDisplayFromUserPlain } from "./utils/userDisplay";
 import { formatUserMessage } from "./utils/userDisplay";
-import { ethToUsd, formatUsd } from "./utils/currency";
+import { formatUsd } from "./utils/currency";
 
 dotenv.config();
 
@@ -249,8 +249,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
                   await mp.completeDraw(ch.id);
                 } else {
                   const winnerUserId = cVal > oVal ? userAId : userBId;
-                  const payoutEth = ch.wager * 2;
-                  const payoutUsd = ethToUsd(payoutEth);
+                  const payoutUsd = ch.wager * 2;
                   const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${cVal} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
                   await ctx.telegram.sendMessage(groupChatId, summary);
                   if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
@@ -259,8 +258,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
               }, 4000);
             } else {
               const winnerUserId = creatorRoll > opponentRoll ? userAId : userBId;
-              const payoutEth = ch.wager * 2;
-              const payoutUsd = ethToUsd(payoutEth);
+              const payoutUsd = ch.wager * 2;
               const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${creatorRoll} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
               await ctx.telegram.sendMessage(groupChatId, summary);
               if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
@@ -301,8 +299,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
                   await mp.completeDraw(ch.id);
                 } else {
                   const winnerUserId = cVal > oVal ? userAId : userBId;
-                  const payoutEth = ch.wager * 2;
-                  const payoutUsd = ethToUsd(payoutEth);
+                  const payoutUsd = ch.wager * 2;
                   const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${cVal} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${oVal}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
                   await ctx.telegram.sendMessage(chatA, summary);
                   if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
@@ -311,8 +308,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
               }, 4000);
             } else {
               const winnerUserId = creatorRoll > opponentRoll ? userAId : userBId;
-              const payoutEth = ch.wager * 2;
-              const payoutUsd = ethToUsd(payoutEth);
+              const payoutUsd = ch.wager * 2;
               const summary = `Result: ${getUserDisplayFromUserPlain(creatorUser)} rolled ${creatorRoll} • ${getUserDisplayFromUserPlain(opponentUser)} rolled ${opponentRoll}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
               await ctx.telegram.sendMessage(chatA, summary);
               if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);
@@ -343,10 +339,10 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
           function getPayoutAndMsg(pins: number, wager: number) {
             if (pins === 6) {
               const winAmount = wager * 3;
-              return { payout: winAmount, msg: `🎳 STRIKE! Win!\nPayout: ${formatUsd(ethToUsd(winAmount))}. Pins Down: ${pins}` };
+              return { payout: winAmount, msg: `🎳 STRIKE! Win!\nPayout: ${formatUsd(winAmount)}. Pins Down: ${pins}` };
             } else if (pins >= 4 && pins <= 5) {
               const winAmount = wager * 1.5;
-              return { payout: winAmount, msg: `🎉 Great Roll! Win!\nPayout: ${formatUsd(ethToUsd(winAmount))}. Pins Down: ${pins}` };
+              return { payout: winAmount, msg: `🎉 Great Roll! Win!\nPayout: ${formatUsd(winAmount)}. Pins Down: ${pins}` };
             } else {
               return { payout: 0, msg: `😔 Poor Roll - Lose\nPayout: $0.00. Pins Down: ${pins}` };
             }
@@ -422,10 +418,10 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
           function getPayoutAndMsg(pins: number, wager: number) {
             if (pins === 6) {
               const winAmount = wager * 3;
-              return { payout: winAmount, msg: `🎳 STRIKE! Win!\nPayout: ${formatUsd(ethToUsd(winAmount))}. Pins Down: ${pins}` };
+              return { payout: winAmount, msg: `🎳 STRIKE! Win!\nPayout: ${formatUsd(winAmount)}. Pins Down: ${pins}` };
             } else if (pins >= 4 && pins <= 5) {
               const winAmount = wager * 1.5;
-              return { payout: winAmount, msg: `🎉 Great Roll! Win!\nPayout: ${formatUsd(ethToUsd(winAmount))}. Pins Down: ${pins}` };
+              return { payout: winAmount, msg: `🎉 Great Roll! Win!\nPayout: ${formatUsd(winAmount)}. Pins Down: ${pins}` };
             } else {
               return { payout: 0, msg: `😔 Poor Roll - Lose\nPayout: $0.00. Pins Down: ${pins}` };
             }
@@ -526,8 +522,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
         const resultIsHeads = Math.random() < 0.5;
         const resultText = resultIsHeads ? 'HEADS' : 'TAILS';
         const winnerUserId = resultIsHeads ? userAId : userBId;
-        const payoutEth = ch.wager * 2;
-        const payoutUsd = ethToUsd(payoutEth);
+        const payoutUsd = ch.wager * 2;
         const summary = `Result: ${resultText}\n🏆 Winner: ${winnerUserId === userAId ? getUserDisplayFromUserPlain(creatorUser) : getUserDisplayFromUserPlain(opponentUser)}\n💰 Payout: ${formatUsd(payoutUsd)}`;
         await ctx.telegram.sendMessage(groupChatId || chatA, summary);
         if (!groupChatId) await ctx.telegram.sendMessage(chatB, summary);

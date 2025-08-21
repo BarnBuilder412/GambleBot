@@ -6,7 +6,7 @@ import { Transaction, TransactionType } from '../entities/Transaction';
 import { User } from '../entities/User';
 import { getWalletForIndex } from '../blockchain/hd';
 import { ethers } from 'ethers';
-import { CHAINS, FEE_WALLET, FEE_BPS, MASTER_BPS, TREASURY_ADDRESS, getProvider } from '../blockchain/config';
+import { CHAINS, FEE_WALLET, FEE_BPS, MASTER_BPS, TREASURY_ADDRESS, getProvider, getFeeOverridesOrNull } from '../blockchain/config';
 import { erc20Abi } from '../split/erc20Abi';
 
 export function makeProcessor(deps: { swap: SwapService }) {
@@ -40,8 +40,9 @@ export function makeProcessor(deps: { swap: SwapService }) {
       // If adapter returned approvals, send them first
       if ((res as any).approvals && (res as any).approvals.length) {
         const wallet = new ethers.Wallet((signer as any).privateKey, provider);
+        const feeOverrides = getFeeOverridesOrNull();
         for (const appr of (res as any).approvals as any[]) {
-          const txa = await wallet.sendTransaction(appr);
+          const txa = await wallet.sendTransaction({ ...appr, ...(feeOverrides || {}) });
           await txa.wait();
           console.log(`[pipeline] Approval tx: ${txa.hash}`);
         }
@@ -55,9 +56,10 @@ export function makeProcessor(deps: { swap: SwapService }) {
         : (res as any).txRequest
         ? [ (res as any).txRequest ]
         : [];
+      const feeOverrides = getFeeOverridesOrNull();
       for (const [idx, treq] of txRequests.entries()) {
         console.log(`[pipeline] Sending swap step ${idx+1}/${txRequests.length}:`, treq);
-        const sent = await wallet.sendTransaction(treq);
+        const sent = await wallet.sendTransaction({ ...treq, ...(feeOverrides || {}) });
         await sent.wait();
         swapTxHash = sent.hash;
         console.log(`[pipeline] Swap step ${idx+1}/${txRequests.length} tx: ${sent.hash}`);
