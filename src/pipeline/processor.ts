@@ -27,6 +27,13 @@ export function makeProcessor(deps: { swap: SwapService }) {
       console.log(`[pipeline] Swap params: from=${signer.address} token=${swap.deposit.token} amountInRaw=${swap.deposit.amountRaw}`);
       const usdcRead = new ethers.Contract(usdcAddress, erc20Abi, provider);
       const beforeBal: bigint = await usdcRead.balanceOf(signer.address);
+      // Pre-read master and fee balances to support one-shot contract path
+      const masterAddr = resolveMaster(swap.deposit.chainKey);
+      const feeAddr = resolveFee(swap.deposit.chainKey);
+      const usdcReadMaster = new ethers.Contract(usdcAddress, erc20Abi, provider);
+      const usdcReadFee = new ethers.Contract(usdcAddress, erc20Abi, provider);
+      const beforeMasterBal: bigint = await usdcReadMaster.balanceOf(masterAddr);
+      const beforeFeeBal: bigint = await usdcReadFee.balanceOf(feeAddr);
 
       const res = await deps.swap.swapToUSDC({
         chainKey: swap.deposit.chainKey,
@@ -40,9 +47,8 @@ export function makeProcessor(deps: { swap: SwapService }) {
       // If adapter returned approvals, send them first
       if ((res as any).approvals && (res as any).approvals.length) {
         const wallet = new ethers.Wallet((signer as any).privateKey, provider);
-        const feeOverrides = getFeeOverridesOrNull();
         for (const appr of (res as any).approvals as any[]) {
-          const txa = await wallet.sendTransaction({ ...appr, ...(feeOverrides || {}) });
+          const txa = await wallet.sendTransaction({ ...appr });
           await txa.wait();
           console.log(`[pipeline] Approval tx: ${txa.hash}`);
         }
@@ -56,39 +62,52 @@ export function makeProcessor(deps: { swap: SwapService }) {
         : (res as any).txRequest
         ? [ (res as any).txRequest ]
         : [];
-      const feeOverrides = getFeeOverridesOrNull();
       for (const [idx, treq] of txRequests.entries()) {
         console.log(`[pipeline] Sending swap step ${idx+1}/${txRequests.length}:`, treq);
-        const sent = await wallet.sendTransaction({ ...treq, ...(feeOverrides || {}) });
+        const sent = await wallet.sendTransaction({ ...treq });
         await sent.wait();
         swapTxHash = sent.hash;
         console.log(`[pipeline] Swap step ${idx+1}/${txRequests.length} tx: ${sent.hash}`);
       }
 
-      // Determine realized USDC out: prefer adapter's value, else balance diff
-      let usdcOut: bigint = res.usdcAmountRaw;
-      if (usdcOut === 0n) {
-        const afterBal: bigint = await usdcRead.balanceOf(signer.address);
-        usdcOut = afterBal > beforeBal ? (afterBal - beforeBal) : 0n;
+      // Determine realized USDC out and handle splitting
+      let masterAmountRaw: bigint = 0n;
+      let feeAmountRaw: bigint = 0n;
+      let splitNote = '';
+      if (res.router === 'eth-to-usdc-direct-v3') {
+        const afterMasterBal: bigint = await usdcReadMaster.balanceOf(masterAddr);
+        const afterFeeBal: bigint = await usdcReadFee.balanceOf(feeAddr);
+        masterAmountRaw = afterMasterBal > beforeMasterBal ? (afterMasterBal - beforeMasterBal) : 0n;
+        feeAmountRaw = afterFeeBal > beforeFeeBal ? (afterFeeBal - beforeFeeBal) : 0n;
+        console.log(`[pipeline] On-chain split detected. Master delta=${masterAmountRaw} Fee delta=${feeAmountRaw}`);
+        splitNote = `Split:onchain MasterDelta:${masterAmountRaw} FeeDelta:${feeAmountRaw}`;
+      } else {
+        // Off-chain split path (legacy adapters)
+        let usdcOut: bigint = res.usdcAmountRaw;
+        if (usdcOut === 0n) {
+          const afterBal: bigint = await usdcRead.balanceOf(signer.address);
+          usdcOut = afterBal > beforeBal ? (afterBal - beforeBal) : 0n;
+        }
+        console.log(`[pipeline] Realized USDC out: ${usdcOut}`);
+        console.log(`[pipeline] Splitting USDC: amount=${usdcOut} master=${masterAddr} fee=${feeAddr} bpsMaster=${MASTER_BPS} bpsFee=${FEE_BPS}`);
+        const split = await splitUsdc({
+          provider,
+          usdc: usdcAddress,
+          fromSigner: new ethers.Wallet(signer.privateKey),
+          master: masterAddr,
+          fee: feeAddr,
+          amountRaw: usdcOut,
+          bpsMaster: MASTER_BPS,
+          bpsFee: FEE_BPS,
+        });
+        console.log(`[pipeline] Split master=${split.masterAmount} fee=${split.feeAmount}`);
+        masterAmountRaw = split.masterAmount;
+        feeAmountRaw = split.feeAmount;
+        splitNote = `Master:${split.masterTx} Fee:${split.feeTx}`;
       }
-      console.log(`[pipeline] Realized USDC out: ${usdcOut}`);
-
-      // 2) Split USDC based on FEE_BPS
-      console.log(`[pipeline] Splitting USDC: amount=${usdcOut} master=${resolveMaster(swap.deposit.chainKey)} fee=${resolveFee(swap.deposit.chainKey)} bpsMaster=${MASTER_BPS} bpsFee=${FEE_BPS}`);
-      const split = await splitUsdc({
-        provider,
-        usdc: usdcAddress,
-        fromSigner: new ethers.Wallet(signer.privateKey),
-        master: resolveMaster(swap.deposit.chainKey),
-        fee: resolveFee(swap.deposit.chainKey),
-        amountRaw: usdcOut,
-        bpsMaster: MASTER_BPS,
-        bpsFee: FEE_BPS,
-      });
-      console.log(`[pipeline] Split master=${split.masterAmount} fee=${split.feeAmount}`);
 
       // 3) Update DB with USDC credited to master
-      const masterUsdc = Number(split.masterAmount) / 1e6; // USDC 6 decimals
+      const masterUsdc = Number(masterAmountRaw) / 1e6; // USDC 6 decimals
       await AppDataSource.transaction(async (m) => {
         const userRepo = m.getRepository(User);
         const txRepo = m.getRepository(Transaction);
@@ -102,7 +121,7 @@ export function makeProcessor(deps: { swap: SwapService }) {
         tx.user = user;
         tx.amount = masterUsdc;
         tx.type = TransactionType.DEPOSIT;
-        tx.description = `Deposit settled to USDC. Swap:${swapTxHash || res.txHash} Master:${split.masterTx} Fee:${split.feeTx}`;
+        tx.description = `Deposit settled to USDC. Swap:${swapTxHash || res.txHash} ${splitNote}`;
 
         await m.save([user, tx]);
       });

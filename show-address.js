@@ -14,6 +14,7 @@ function getAddressForIndex(userIndex) {
     const wallet = ethers.HDNodeWallet.fromPhrase(mnemonic, undefined, derivationPath);
     
     console.log(wallet.address);
+    
     return wallet.address;
   } catch (error) {
     console.error(`Error deriving address for index ${userIndex}: ${error.message}`);

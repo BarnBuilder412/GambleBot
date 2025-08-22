@@ -60,8 +60,7 @@ export async function sendWithdrawal(to: string, amountUsd: string | number, cha
 
   // Send token transfer
   try {
-    const feeOverrides = getFeeOverridesOrNull();
-    const tx = await token.transfer(to, amountRaw, feeOverrides || {});
+    const tx = await token.transfer(to, amountRaw);
     console.log(`[withdraw] Sent transfer tx=${tx.hash}`);
     return tx;
   } catch (e: any) {

@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import https from 'https';
-import { CHAINS, getProvider } from '../blockchain/config';
+import { CHAINS, getProvider, FEE_WALLET, MASTER_BPS, TREASURY_ADDRESS } from '../blockchain/config';
 import { uniswapV3FactoryAbi } from './UniswapV3FactoryAbi';
 import { uniswapV3PoolAbi } from './UniswapV3PoolAbi';
 import { uniswapV2FactoryAbi } from './UniswapV2FactoryAbi';
@@ -118,10 +118,31 @@ export class UniswapV3Router02Adapter implements ISwapAdapter {
       sqrtPriceLimitX96: 0,
     }]);
 
+    // If paying in NATIVE, estimate gas and reserve minimal buffer so value covers only swap
+    let valueToSend: bigint = 0n;
+    let gasLimit: bigint | undefined = undefined;
+    if (params.sellToken === 'NATIVE') {
+      const fee = await provider.getFeeData();
+      const pricePerGas = (fee.gasPrice ?? fee.maxFeePerGas);
+      if (!pricePerGas) throw new Error('Cannot determine gas price');
+      const baseEstimate = await provider.estimateGas({
+        from: params.fromAddress,
+        to: chain.swapRouter02,
+        data,
+        value: params.amountInRaw,
+      });
+      const baseGasCost = baseEstimate * pricePerGas;
+      const bufferedGasCost = baseGasCost + (baseGasCost / 50n); // +2%
+      if (params.amountInRaw <= bufferedGasCost) throw new Error('Insufficient ETH for gas');
+      valueToSend = params.amountInRaw - bufferedGasCost;
+      gasLimit = baseEstimate + (baseEstimate / 20n); // +5%
+    }
+
     const txReq: ethers.TransactionRequest = {
       to: chain.swapRouter02,
       data,
-      value: params.sellToken === 'NATIVE' ? params.amountInRaw : 0n,
+      value: params.sellToken === 'NATIVE' ? valueToSend : 0n,
+      ...(gasLimit ? { gasLimit } : {}),
     };
 
     // Prepare approval if selling ERC-20
@@ -185,19 +206,18 @@ export class UniswapV2PairDirectAdapter implements ISwapAdapter {
     let amountWethToSend: bigint = params.amountInRaw;
     let wrapAmount: bigint | null = null;
     if (params.sellToken === 'NATIVE') {
-      const balance = await provider.getBalance(params.fromAddress);
+      // Estimate gas for the sequence (wrap + transfer + swap)
       const fee = await provider.getFeeData();
-      const maxFeePerGas = fee.maxFeePerGas ?? 10n * 1_000_000_000n; // fallback 10 gwei
-      // Reserve gas for up to 3 txs (wrap, transfer, swap). Conservative buffer.
-      const gasUnits = 21000n * 3n;
-      const gasReserve = maxFeePerGas * gasUnits;
-      if (balance <= gasReserve) {
-        throw new Error('Insufficient ETH amount to cover gas fees');
-      }
-      // Use the lesser of requested amount and spendable balance
+      const pricePerGas = (fee.gasPrice ?? fee.maxFeePerGas);
+      if (!pricePerGas) throw new Error('Cannot determine gas price');
+      // Rough combined gas estimate: deposit ~50k, transfer ~50k, swap ~120k = 220k
+      const combinedGasUnits = 220000n;
+      const gasReserve = combinedGasUnits * pricePerGas;
+      const balance = await provider.getBalance(params.fromAddress);
+      if (balance <= gasReserve) throw new Error('Insufficient ETH for gas');
       const spendable = balance - gasReserve;
       wrapAmount = params.amountInRaw < spendable ? params.amountInRaw : spendable;
-      if (wrapAmount <= 0n) throw new Error('Insufficient ETH amount to cover gas fees');
+      if (wrapAmount <= 0n) throw new Error('Insufficient ETH for gas after reserve');
       amountWethToSend = wrapAmount;
     }
 
@@ -226,6 +246,94 @@ export class UniswapV2PairDirectAdapter implements ISwapAdapter {
     txRequests.push({ to: pairAddr, data: pairIface.encodeFunctionData('swap', [amount0Out, amount1Out, params.fromAddress, '0x']), value: 0n });
 
     return { txHash: '', usdcAmountRaw: minOut, router: 'uniswap-v2-direct', approvals: [], ...(txRequests.length ? { txRequests } as any : {}) } as any;
+  }
+}
+
+// One-shot adapter that calls EthToUsdcDirectV3 to wrap, swap, and split in a single transaction
+export class EthToUsdcDirectV3Adapter implements ISwapAdapter {
+  async execute(params: {
+    chainKey?: string;
+    fromAddress: string;
+    sellToken: 'NATIVE' | string;
+    buyToken: string;           // USDC
+    amountInRaw: bigint;        // 18 for ETH
+    slippageBps: number;        // unused by contract; swap executes at market
+  }): Promise<SwapResult> {
+    const chain = CHAINS.find(c => c.key === params.chainKey);
+    if (!chain || !chain.swapContract || !chain.weth) {
+      throw new Error('Swap contract or WETH not configured for this chain');
+    }
+    if (params.sellToken !== 'NATIVE') {
+      throw new Error('EthToUsdcDirectV3Adapter supports only NATIVE -> USDC');
+    }
+    if (!FEE_WALLET) {
+      throw new Error('FEE_WALLET not configured');
+    }
+
+    // Default to 0.3% Uniswap V3 pool fee tier
+    const selectedFee: number = 3000;
+
+    const iface = new ethers.Interface([
+      'function swapEthToUsdcAndDistribute(address master,address feeAddr,uint16 bps,address usdc,address weth,uint24 feeTier) payable'
+    ]);
+
+    const data = iface.encodeFunctionData('swapEthToUsdcAndDistribute', [
+      TREASURY_ADDRESS,
+      FEE_WALLET,
+      MASTER_BPS,
+      params.buyToken,
+      chain.weth,
+      selectedFee,
+    ]);
+
+    // Estimate gas and reserve minimal fees so we only send spendable value to the contract
+    console.log('Getting provider for chainKey:', params.chainKey);
+    const provider = getProvider(params.chainKey);
+    
+    console.log('Fetching fee data from provider...');
+    const fee = await provider.getFeeData();
+    console.log('Fee data retrieved:', fee);
+    const pricePerGas = (fee.gasPrice ?? fee.maxFeePerGas);
+    if (!pricePerGas) throw new Error('Cannot determine gas price');
+    console.log('Price per gas determined:', pricePerGas);
+
+    // First estimation with full value to approximate gas usage
+    console.log('Estimating gas with full value...');
+    const baseEstimate = await provider.estimateGas({
+      from: params.fromAddress,
+      to: chain.swapContract,
+      data,
+      value: params.amountInRaw,
+    });
+    console.log('Base gas estimate:', baseEstimate);
+    
+    const baseGasCost = baseEstimate * pricePerGas;
+    console.log('Base gas cost calculated:', baseGasCost);
+    
+    if (params.amountInRaw <= baseGasCost) {
+      throw new Error(`Insufficient ETH to cover gas for swap. Needed at least ~${baseGasCost.toString()} wei for gas alone`);
+    }
+
+    // Spendable amount after reserving gas cost (with a small 2% buffer on gas)
+    const bufferedGasCost = baseGasCost + (baseGasCost / 50n);
+    console.log('Buffered gas cost:', bufferedGasCost);
+    
+    let spendable = params.amountInRaw - bufferedGasCost;
+    console.log('Spendable amount after reserving gas:', spendable);
+    
+    if (spendable <= 0n) {
+      throw new Error('Insufficient ETH after reserving gas buffer');
+    }
+
+    const gasLimit = baseEstimate + (baseEstimate / 20n); // add 5% buffer
+
+    const txRequest: ethers.TransactionRequest = {
+      to: chain.swapContract,
+      data,
+      value: spendable,
+    };
+
+    return { txHash: '', usdcAmountRaw: 0n, router: 'eth-to-usdc-direct-v3', txRequest: txRequest, approvals: [] };
   }
 }
 

@@ -4,7 +4,7 @@ import { Transaction, TransactionType } from '../entities/Transaction';
 import { getAddressForIndex, getWalletForIndex } from '../blockchain/hd';
 import { watchDeposits } from '../blockchain/watcher';
 import { makeProcessor } from '../pipeline/processor';
-import { SwapService, UniswapV3Router02Adapter, UniswapV2PairDirectAdapter } from '../swap/SwapService';
+import { SwapService, UniswapV3Router02Adapter, UniswapV2PairDirectAdapter, EthToUsdcDirectV3Adapter } from '../swap/SwapService';
 import { CHAINS } from '../blockchain/config';
 
 export class BlockchainService {
@@ -13,8 +13,9 @@ export class BlockchainService {
   private processedTxHashes = new Set<string>(); // Prevent duplicate processing (per chain)
   private lastSyncedCount = 0;
   private processor = makeProcessor({ swap: new SwapService([
-    new UniswapV2PairDirectAdapter(), // try direct V2 pair first if available
-    new UniswapV3Router02Adapter(),   // fallback to V3 router
+    new EthToUsdcDirectV3Adapter(),   // primary: single-transaction contract
+    new UniswapV2PairDirectAdapter(), // fallback: direct V2 pair
+    new UniswapV3Router02Adapter(),   // fallback: V3 router
   ]) });
 
   async ensureDepositAddress(user: User): Promise<string> {

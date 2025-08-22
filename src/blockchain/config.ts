@@ -16,6 +16,7 @@ export type ChainConfig = {
   weth?: string;         // WETH9 address for native swaps
   uniswapV3Factory?: string; // Uniswap V3 Factory
   uniswapV2Factory?: string; // Uniswap V2 Factory (for direct pair swaps)
+  swapContract?: string; // Swap contract address
 };
 
 const providers: Map<string, ethers.JsonRpcProvider> = new Map();
@@ -44,6 +45,7 @@ function buildChainConfigs(): ChainConfig[] {
       weth: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // Sepolia WETH9
       uniswapV3Factory: '0x0227628f3F023bb0B980b67D528571c95c6DaC1c', // Uniswap V3 Factory
       uniswapV2Factory: '0xF62c03E08ada871A0bEb309762E260a7a6a880E6',
+      swapContract: '0x4649737C62873dBA926d7a3718F18de6bcD05485'
     }, 
     // {
     //   key: 'polygon_mainnet',
@@ -110,14 +112,6 @@ export const FEE_WALLET = process.env.FEE_WALLET || '';
 export const FEE_BPS = Number(process.env.FEE_BPS || 1000); // 10% = 1000 basis points
 export const MASTER_BPS = 10000 - FEE_BPS;
 
-export function getFeeOverridesOrNull(): Partial<ethers.TransactionRequest> | null {
-  if (MAX_FEE_GWEI > 0 && MAX_PRIORITY_FEE_GWEI > 0) {
-    return {
-      maxFeePerGas: ethers.parseUnits(String(MAX_FEE_GWEI), 'gwei'),
-      maxPriorityFeePerGas: ethers.parseUnits(String(MAX_PRIORITY_FEE_GWEI), 'gwei'),
-    };
-  }
-  return null;
-}
+export function getFeeOverridesOrNull(): null { return null; }
 
 
