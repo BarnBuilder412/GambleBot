@@ -53,6 +53,14 @@ Community: @BlockRally
 Then send this list:
 ```
 play - 🎲 Quick access to all games (Dice, Bowling, Coinflip)
+dice - 🎲 Quick dice game with amount (e.g., /dice 10)
+bowling - 🎳 Quick bowling game with amount (e.g., /bowling 5)
+coinflip - 🪙 Quick coinflip game with amount (e.g., /coinflip 2.50)
+balance - 💰 Check your current balance
+history - 📊 View your game transaction history (private)
+transactions - 💰 View your deposit/withdrawal history (private)
+deposit - 💰 Quick access to deposit funds (private)
+withdraw - 🏧 Quick access to withdraw funds (private)
 ```
 
 ### 5. Set Bot Picture (Profile Photo)

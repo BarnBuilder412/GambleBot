@@ -13,6 +13,7 @@ import { GameHandler } from "./handlers/GameHandler";
 import { MultiplayerService } from "./services/MultiplayerService";
 import { PvPGameService } from "./services/PvPGameService";
 import { formatUserMessage } from "./utils/userDisplay";
+import { CommandHandler } from "./handlers/CommandHandler";
 
 dotenv.config();
 
@@ -55,6 +56,44 @@ bot.command('play', async (ctx) => {
   await menuHandler.handleStart(ctx);
 });
 
+// New quick game commands with amount
+bot.command('dice', async (ctx) => {
+  await commandHandler.handleQuickGameCommand(ctx, 'Dice');
+});
+
+bot.command('bowling', async (ctx) => {
+  await commandHandler.handleQuickGameCommand(ctx, 'Bowling');
+});
+
+bot.command('coinflip', async (ctx) => {
+  await commandHandler.handleQuickGameCommand(ctx, 'Coinflip');
+});
+
+// Quick balance check command
+bot.command('balance', async (ctx) => {
+  await commandHandler.handleBalanceCommand(ctx);
+});
+
+// Game history command
+bot.command('history', async (ctx) => {
+  await commandHandler.handleHistoryCommand(ctx);
+});
+
+// Onchain transaction history command
+bot.command('transactions', async (ctx) => {
+  await commandHandler.handleOnchainCommand(ctx);
+});
+
+// Quick deposit command
+bot.command('deposit', async (ctx) => {
+  await commandHandler.handleDepositCommand(ctx);
+});
+
+// Quick withdraw command
+bot.command('withdraw', async (ctx) => {
+  await commandHandler.handleWithdrawCommand(ctx);
+});
+
 // Initialize services and handlers
 const userService = new UserService();
 const gameManager = new GameManager(userService);
@@ -63,6 +102,7 @@ const walletHandler = new WalletHandler(userService);
 const gameHandler = new GameHandler(gameManager);
 const multiplayerService = new MultiplayerService(userService);
 const pvpGameService = new PvPGameService(userService, multiplayerService);
+const commandHandler = new CommandHandler(userService, gameManager);
 
 // Guard: ensure callback button is used by the intended user
 const ensureOwner = async (ctx: any, expectedUserIdStr: string) => {
@@ -231,6 +271,40 @@ bot.action('cancel_withdraw', async (ctx) => {
 
 bot.action('deposit_chain_eth_sepolia', async (ctx) => {
   await walletHandler.handleDepositChainEthSepolia(ctx);
+});
+
+// Handle history button action
+bot.action(/show_history_u(\d+)/, async (ctx) => {
+  const uid = ctx.match?.[1];
+  if (!(await ensureOwner(ctx, uid))) return;
+  await ctx.answerCbQuery();
+  await commandHandler.handleHistoryCommand(ctx, 1, true); // isEdit = true for button action
+});
+
+// Handle history pagination
+bot.action(/history_page_(\d+)_u(\d+)/, async (ctx) => {
+  const page = parseInt(ctx.match?.[1] || '1', 10);
+  const uid = ctx.match?.[2];
+  if (!(await ensureOwner(ctx, uid))) return;
+  await ctx.answerCbQuery();
+  await commandHandler.handleHistoryCommand(ctx, page, true); // isEdit = true for pagination
+});
+
+// Handle onchain history button action
+bot.action(/show_transactions_u(\d+)/, async (ctx) => {
+  const uid = ctx.match?.[1];
+  if (!(await ensureOwner(ctx, uid))) return;
+  await ctx.answerCbQuery();
+  await commandHandler.handleOnchainCommand(ctx, 1, true); // isEdit = true for button action
+});
+
+// Handle onchain pagination
+bot.action(/transactions_page_(\d+)_u(\d+)/, async (ctx) => {
+  const page = parseInt(ctx.match?.[1] || '1', 10);
+  const uid = ctx.match?.[2];
+  if (!(await ensureOwner(ctx, uid))) return;
+  await ctx.answerCbQuery();
+  await commandHandler.handleOnchainCommand(ctx, page, true); // isEdit = true for pagination
 });
 
 // Listen for text input (wager, withdrawal address, withdrawal amount)
