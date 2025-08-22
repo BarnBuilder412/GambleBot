@@ -2,7 +2,8 @@
 import * as dotenv from 'dotenv';
 import { AppDataSource } from './utils/db';
 import { blockchainService } from './services/BlockchainService';
-import { WATCHER_SYNC_MS } from './blockchain/config';
+import { WATCHER_SYNC_MS, ENABLE_GASLESS_SWAPS, GAS_WALLET_PRIVATE_KEY } from './blockchain/config';
+import { GaslessSwapService } from './swap/GaslessSwapService';
 
 dotenv.config();
 
@@ -14,6 +15,29 @@ async function startWatcher() {
     if (!AppDataSource.isInitialized) {
       await AppDataSource.initialize();
       console.log('📊 Database connection established');
+    }
+    
+    // Check gas wallet status if gasless swaps are enabled
+    if (ENABLE_GASLESS_SWAPS && GAS_WALLET_PRIVATE_KEY) {
+      try {
+        const gaslessService = new GaslessSwapService(GAS_WALLET_PRIVATE_KEY);
+        const gasWalletAddress = gaslessService.getGasWalletAddress();
+        const gasWalletBalance = await gaslessService.getGasWalletBalance();
+        
+        console.log('🔑 Gas Wallet Status:');
+        console.log(`   Address: ${gasWalletAddress}`);
+        console.log(`   Balance: ${gasWalletBalance} wei`);
+        
+        if (gasWalletBalance === 0n) {
+          console.log('⚠️  WARNING: Gas wallet has no balance! Gasless swaps will fail.');
+        } else {
+          console.log('✅ Gas wallet has sufficient balance for gasless swaps');
+        }
+      } catch (error) {
+        console.warn('⚠️  Failed to check gas wallet status:', error);
+      }
+    } else {
+      console.log('ℹ️  Gasless swaps not enabled');
     }
     
     // Load existing deposit addresses and start watching

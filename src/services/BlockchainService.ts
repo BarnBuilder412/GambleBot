@@ -15,7 +15,7 @@ export class BlockchainService {
   private processor = makeProcessor({ swap: new SwapService([
     new UniswapV2PairDirectAdapter(), // try direct V2 pair first if available
     new UniswapV3Router02Adapter(),   // fallback to V3 router
-  ]) });
+  ], 'eth_sepolia') });
 
   async ensureDepositAddress(user: User): Promise<string> {
     if (user.depositAddress) {

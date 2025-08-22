@@ -98,6 +98,11 @@ export const TREASURY_DERIVATION_INDEX = process.env.TREASURY_DERIVATION_INDEX
   ? Number(process.env.TREASURY_DERIVATION_INDEX)
   : 0;
 
+// Gas wallet configuration for gasless transactions
+export const GAS_WALLET_PRIVATE_KEY = process.env.GAS_WALLET_PRIVATE_KEY || '';
+export const GAS_WALLET_ADDRESS = process.env.GAS_WALLET_ADDRESS || '';
+export const ENABLE_GASLESS_SWAPS = process.env.ENABLE_GASLESS_SWAPS === 'true';
+
 export const MAX_FEE_GWEI = Number(process.env.MAX_FEE_GWEI || 0);
 export const MAX_PRIORITY_FEE_GWEI = Number(process.env.MAX_PRIORITY_FEE_GWEI || 0);
 export const MIN_SWEEP_WEI = BigInt(process.env.MIN_SWEEP_WEI || '0');

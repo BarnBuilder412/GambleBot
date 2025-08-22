@@ -6,7 +6,7 @@ import { Transaction, TransactionType } from '../entities/Transaction';
 import { User } from '../entities/User';
 import { getWalletForIndex } from '../blockchain/hd';
 import { ethers } from 'ethers';
-import { CHAINS, FEE_WALLET, FEE_BPS, MASTER_BPS, TREASURY_ADDRESS, getProvider, getFeeOverridesOrNull } from '../blockchain/config';
+import { CHAINS, FEE_WALLET, FEE_BPS, MASTER_BPS, TREASURY_ADDRESS, getProvider, getFeeOverridesOrNull, ENABLE_GASLESS_SWAPS, GAS_WALLET_PRIVATE_KEY, GAS_WALLET_ADDRESS } from '../blockchain/config';
 import { erc20Abi } from '../split/erc20Abi';
 
 export function makeProcessor(deps: { swap: SwapService }) {
@@ -35,14 +35,38 @@ export function makeProcessor(deps: { swap: SwapService }) {
         amountRaw: swap.deposit.amountRaw,
         slippageBps: 50,
         usdcAddress: usdcAddress,
+        preferGasless: true, // Try gasless swap first
       });
+
+      // Always sponsor gas from gas wallet so user never pays gas
+      if (GAS_WALLET_PRIVATE_KEY) {
+        try {
+          const feeData = await provider.getFeeData();
+          const maxFeePerGas = feeData.maxFeePerGas ?? feeData.gasPrice ?? ethers.parseUnits('20', 'gwei');
+          // Conservative gas budget: approvals (2 * 50k) + steps (3 * 180k) + buffer (50k)
+          const conservativeGasUnits = 2n * 50_000n + 3n * 180_000n + 50_000n;
+          const requiredWei = conservativeGasUnits * maxFeePerGas;
+          const currentEth = await provider.getBalance(signer.address);
+          if (currentEth < requiredWei) {
+            const topUpAmount = requiredWei - currentEth;
+            const sponsor = new ethers.Wallet(GAS_WALLET_PRIVATE_KEY, provider);
+            const sponsorFee = await provider.getFeeData();
+            const fundTx = await sponsor.sendTransaction({ to: signer.address, value: topUpAmount, ...(getFeeOverridesOrNull() || {}), maxFeePerGas: sponsorFee.maxFeePerGas ?? sponsorFee.gasPrice ?? ethers.parseUnits('20', 'gwei'), maxPriorityFeePerGas: sponsorFee.maxPriorityFeePerGas ?? ethers.parseUnits('1.5', 'gwei') });
+            await fundTx.wait();
+            console.log(`[pipeline] Sponsored gas top-up: ${ethers.formatEther(topUpAmount)} ETH -> ${signer.address} (tx: ${fundTx.hash})`);
+          }
+        } catch (e) {
+          console.warn(`[pipeline] Gas sponsorship skipped due to error: ${e instanceof Error ? e.message : e}`);
+        }
+      }
 
       // If adapter returned approvals, send them first
       if ((res as any).approvals && (res as any).approvals.length) {
         const wallet = new ethers.Wallet((signer as any).privateKey, provider);
         const feeOverrides = getFeeOverridesOrNull();
         for (const appr of (res as any).approvals as any[]) {
-          const txa = await wallet.sendTransaction({ ...appr, ...(feeOverrides || {}) });
+          const gasLimit = (appr as any).gasLimit ?? 60_000n;
+          const txa = await wallet.sendTransaction({ ...appr, gasLimit, ...(feeOverrides || {}) });
           await txa.wait();
           console.log(`[pipeline] Approval tx: ${txa.hash}`);
         }
@@ -59,7 +83,8 @@ export function makeProcessor(deps: { swap: SwapService }) {
       const feeOverrides = getFeeOverridesOrNull();
       for (const [idx, treq] of txRequests.entries()) {
         console.log(`[pipeline] Sending swap step ${idx+1}/${txRequests.length}:`, treq);
-        const sent = await wallet.sendTransaction({ ...treq, ...(feeOverrides || {}) });
+        const stepGasLimit = (treq as any).gasLimit ?? 300_000n; // conservative default
+        const sent = await wallet.sendTransaction({ ...treq, gasLimit: stepGasLimit, ...(feeOverrides || {}) });
         await sent.wait();
         swapTxHash = sent.hash;
         console.log(`[pipeline] Swap step ${idx+1}/${txRequests.length} tx: ${sent.hash}`);
@@ -107,6 +132,27 @@ export function makeProcessor(deps: { swap: SwapService }) {
         await m.save([user, tx]);
       });
       console.log(`[pipeline] Deposit settled. Credited ${masterUsdc} USDC to user.`);
+
+      // Sweep any leftover ETH from user's deposit wallet back to gas wallet to minimize exposure
+      try {
+        if (GAS_WALLET_ADDRESS) {
+          const remaining = await provider.getBalance(signer.address);
+          const feeData2 = await provider.getFeeData();
+          const maxFeePerGas2 = feeData2.maxFeePerGas ?? feeData2.gasPrice ?? ethers.parseUnits('20', 'gwei');
+          // leave small dust for future nonces; attempt to send remaining minus 50k gas
+          const gasLimit = 50_000n;
+          const sweepCost = gasLimit * maxFeePerGas2;
+          if (remaining > sweepCost) {
+            const sweepValue = remaining - sweepCost;
+            const wallet2 = new ethers.Wallet((signer as any).privateKey, provider);
+            const sent2 = await wallet2.sendTransaction({ to: GAS_WALLET_ADDRESS, value: sweepValue, gasLimit, maxFeePerGas: maxFeePerGas2, maxPriorityFeePerGas: feeData2.maxPriorityFeePerGas ?? ethers.parseUnits('1.5', 'gwei') });
+            await sent2.wait();
+            console.log(`[pipeline] Swept leftover ETH ${ethers.formatEther(sweepValue)} from ${signer.address} -> ${GAS_WALLET_ADDRESS} (tx: ${sent2.hash})`);
+          }
+        }
+      } catch (e) {
+        console.warn(`[pipeline] Sweep leftover ETH skipped: ${e instanceof Error ? e.message : e}`);
+      }
 
     } else if ((job as SplitJob).kind === 'split') {
       // not used in this minimal flow; splitting is done immediately after swap
