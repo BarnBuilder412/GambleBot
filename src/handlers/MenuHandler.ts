@@ -93,6 +93,11 @@ export class MenuHandler {
       wagerButtons.push([Markup.button.callback("📋 Game Rules", "coinflip_rules")]);
     }
 
+    // Add view open challenges button
+    wagerButtons.push([
+      Markup.button.callback("🗒 View Open Challenges", `pvp_list_${gameName}`)
+    ]);
+
     // Add back button
     wagerButtons.push([
       Markup.button.callback("🔙 Back", `play_u${uid}`)

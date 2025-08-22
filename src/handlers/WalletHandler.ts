@@ -42,7 +42,7 @@ export class WalletHandler {
         await ctx.telegram.sendPhoto(
           userId,
           { source: buffer },
-          { caption: `Your deposit Ethereum address:\n\`${depositAddress}\``, parse_mode: 'MarkdownV2' }
+          { caption: `10% of your deposit will be used as a network fee\nDeposit will take 2 to 3 minutes\n\n Your deposit Ethereum address:\n\`${depositAddress}\``, parse_mode: 'MarkdownV2' }
         );
       } catch (e) {
         const me = await ctx.telegram.getMe();
@@ -53,7 +53,7 @@ export class WalletHandler {
       await ctx.replyWithPhoto(
         { source: buffer },
         {
-          caption: `Your deposit Ethereum address:\n\`${depositAddress}\``,
+          caption: `10% of your deposit will be used as a network fee\nDeposit will take 2 to 3 minutes\n\n Your deposit Ethereum address:\n\`${depositAddress}\``,
           parse_mode: "MarkdownV2",
         }
       );
