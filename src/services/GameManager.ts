@@ -22,9 +22,11 @@ export class GameManager {
   };
 
   private userService: UserService;
+  private pvpGameService: any;
 
-  constructor(userService: UserService) {
+  constructor(userService: UserService, pvpGameService?: any) {
     this.userService = userService;
+    this.pvpGameService = pvpGameService;
   }
 
   getAvailableGames(): string[] {
@@ -144,6 +146,24 @@ export class GameManager {
       // If game fails after deduction, refund the wager
       await this.userService.updateBalance(user, ctx.session.wager, TransactionType.REFUND, 'Bowling game error refund');
       return { success: false, message: 'Game error occurred. Wager refunded.' };
+    }
+  }
+
+  async startPvPGameWithBot(ctx: any, challenge: any) {
+    // This method should trigger the PvP game logic as if the bot was a real player
+    // For now, just call the PvPGameService handler for the selected game
+    switch (challenge.game) {
+      case 'Dice':
+        await this.pvpGameService.handlePvPDice(ctx, challenge);
+        break;
+      case 'Bowling':
+        await this.pvpGameService.handlePvPBowling(ctx, challenge);
+        break;
+      case 'Coinflip':
+        await this.pvpGameService.handlePvPCoinflip(ctx, challenge);
+        break;
+      default:
+        await ctx.reply('Unknown game type for PvP bot match.');
     }
   }
 

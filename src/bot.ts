@@ -96,12 +96,12 @@ bot.command('withdraw', async (ctx) => {
 
 // Initialize services and handlers
 const userService = new UserService();
-const gameManager = new GameManager(userService);
-const menuHandler = new MenuHandler(userService, gameManager);
-const walletHandler = new WalletHandler(userService);
-const gameHandler = new GameHandler(gameManager);
 const multiplayerService = new MultiplayerService(userService);
 const pvpGameService = new PvPGameService(userService, multiplayerService);
+const gameManager = new GameManager(userService, pvpGameService);
+const menuHandler = new MenuHandler(userService, gameManager, pvpGameService);
+const walletHandler = new WalletHandler(userService);
+const gameHandler = new GameHandler(gameManager);
 const commandHandler = new CommandHandler(userService, gameManager);
 
 // Guard: ensure callback button is used by the intended user
@@ -347,6 +347,16 @@ bot.action(/coinflip_tails_u(\d+)/, async (ctx) => {
   const uid = ctx.match?.[1];
   if (!(await ensureOwner(ctx, uid))) return;
   await gameHandler.handleCoinflipGuess(ctx, 'tails');
+});
+
+// Handle single player game selection
+bot.action(/single_(.+)_u(\d+)/, async (ctx) => {
+  const gameName = ctx.match?.[1];
+  const uid = ctx.match?.[2];
+  if (!(await ensureOwner(ctx, uid))) return;
+  if (gameName) {
+    await menuHandler.handleSinglePlayer(ctx, gameName);
+  }
 });
 
 // Utility: Retry async function with exponential backoff

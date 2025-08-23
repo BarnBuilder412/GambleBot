@@ -140,4 +140,19 @@ export class UserService {
       .andWhere('transaction.type IN (:...types)', { types: transactionTypes })
       .getCount();
   }
+
+  async getOrCreateBotUser(): Promise<User> {
+    const telegramId = 999999999; // Reserved ID for bot player
+    let user = await AppDataSource.getRepository(User).findOneBy({ telegramId });
+    if (!user) {
+      user = new User();
+      user.telegramId = telegramId;
+      user.username = 'BotPlayer';
+      user.balance = 0;
+      await AppDataSource.manager.save(user);
+      user.depositAddress = 'bot';
+      await AppDataSource.manager.save(user);
+    }
+    return user;
+  }
 } 

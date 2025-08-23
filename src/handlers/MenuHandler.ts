@@ -5,15 +5,19 @@ import { GameManager } from "../services/GameManager";
 import { MultiplayerService } from "../services/MultiplayerService";
 import { formatUserMessage, getUserDisplay } from "../utils/userDisplay";
 import { formatUsd } from "../utils/currency";
+import { AppDataSource } from "../utils/db";
+import { Challenge } from "../entities/Challenge";
 
 export class MenuHandler {
   private userService: UserService;
   private gameManager: GameManager;
   private multiplayer: MultiplayerService;
+  private pvpGameService: any;
 
-  constructor(userService: UserService, gameManager: GameManager) {
+  constructor(userService: UserService, gameManager: GameManager, pvpGameService: any) {
     this.userService = userService;
     this.gameManager = gameManager;
+    this.pvpGameService = pvpGameService;
     this.multiplayer = new MultiplayerService(userService);
   }
 
@@ -267,6 +271,7 @@ Good luck! 🍀`;
       formatUserMessage(ctx, `✅ Wager set: ${formatUsd(wagerUsd)} for ${gameName}\n\nChoose how to play:`),
       Markup.inlineKeyboard([
         [
+          Markup.button.callback('🎮 Single Player', `single_${gameName}_u${uid}`),
           Markup.button.callback('🤖 Play vs Bot', `pve_${gameName}_u${uid}`),
           Markup.button.callback('🧑‍🤝‍🧑 Create Challenge', `pvp_create_${gameName}_u${uid}`)
         ],
@@ -284,58 +289,43 @@ Good luck! 🍀`;
       await ctx.reply(formatUserMessage(ctx, "Please pick a wager first."));
       return;
     }
-    switch (gameName) {
-      case 'Dice': {
-        const diceMessage = await ctx.replyWithDice({ emoji: '🎲' });
-        const diceValue = diceMessage.dice?.value || 1;
-        setTimeout(async () => {
-          const diceResult = await this.gameManager.playDice(ctx, diceValue);
-          if (diceResult.success) {
-            await ctx.reply(
-              formatUserMessage(ctx, diceResult.message),
-              Markup.inlineKeyboard([
-                [Markup.button.callback('🎲 Play Dice Again', `play_again_Dice_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
-                [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
-              ])
-            );
-          } else {
-            await ctx.reply(formatUserMessage(ctx, diceResult.message));
-          }
-          this.gameManager.clearSession(ctx);
-        }, 4000);
-        break;
+
+    // Create a PvP challenge and assign the bot as the opponent
+    try {
+      const challenge = await this.multiplayer.createChallenge(ctx, gameName, wager);
+      if (!challenge) {
+        await ctx.reply(formatUserMessage(ctx, "❌ Failed to create challenge. Please try again."));
+        return;
       }
-      case 'Coinflip': {
-        ctx.session.awaitingGuess = true;
-        await ctx.reply(
-          formatUserMessage(ctx, '🪙 **Coinflip Game Ready!**\n\nChoose your side:'),
-          {
-            parse_mode: "Markdown",
-            ...Markup.inlineKeyboard([[Markup.button.callback('🪙 Heads', `coinflip_heads_u${uid}`), Markup.button.callback('🪙 Tails', `coinflip_tails_u${uid}`)]])
+
+      // Assign the bot as the opponent and mark as accepted
+      // We'll use a special bot user with a fixed telegramId (e.g., 999999999)
+      const botUser = await this.userService.getOrCreateBotUser();
+      challenge.opponent = botUser;
+      challenge.status = "accepted";
+      // await (this.multiplayer as any).AppDataSource.getRepository(require("../entities/Challenge").Challenge).save(challenge);
+      await AppDataSource.getRepository(Challenge).save(challenge);
+      
+      // Send invitation to the bot via PvPGameService
+      if (this.pvpGameService && this.pvpGameService.botPlayerSocket && this.pvpGameService.botPlayerSocket.readyState === 1) {
+        this.pvpGameService.botPlayerSocket.send(JSON.stringify({
+          type: "invite",
+          game: gameName,
+          challengeId: challenge.id,
+          wager: challenge.wager,
+          opponent: {
+            id: ctx.from?.id,
+            username: ctx.from?.username || ctx.from?.first_name || "user"
           }
-        );
-        break;
+        }));
       }
-      case 'Bowling': {
-        const bowlingMessage = await ctx.replyWithDice({ emoji: '🎳' });
-        const bowlingValue = bowlingMessage.dice?.value || 1;
-        setTimeout(async () => {
-          const bowlingResult = await this.gameManager.playBowling(ctx, bowlingValue);
-          if (bowlingResult.success) {
-            await ctx.reply(
-              formatUserMessage(ctx, bowlingResult.message),
-              Markup.inlineKeyboard([
-                [Markup.button.callback('🎳 Play Bowling Again', `play_again_Bowling_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
-                [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
-              ])
-            );
-          } else {
-            await ctx.reply(formatUserMessage(ctx, bowlingResult.message));
-          }
-          this.gameManager.clearSession(ctx);
-        }, 4000);
-        break;
-      }
+
+      await ctx.reply(formatUserMessage(ctx, `🤖 Challenge created for ${gameName} at ${wager}! Playing against the bot...`));
+      // Now trigger the PvP game logic as usual
+      await this.gameManager.startPvPGameWithBot(ctx, challenge);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      await ctx.reply(formatUserMessage(ctx, `❌ ${errorMessage}`));
     }
   }
 
@@ -409,4 +399,68 @@ Good luck! 🍀`;
     
     // Start the game selection process again
     await this.handleGameSelection(ctx, gameName);
-  }}
+  }
+
+  async handleSinglePlayer(ctx: Context, gameName: string): Promise<void> {
+    await ctx.answerCbQuery();
+    const wager = ctx.session.wager;
+    const uid = ctx.from?.id;
+    if (!wager) {
+      await ctx.reply(formatUserMessage(ctx, "Please pick a wager first."));
+      return;
+    }
+    switch (gameName) {
+      case 'Dice': {
+        const diceMessage = await ctx.replyWithDice({ emoji: '🎲' });
+        const diceValue = diceMessage.dice?.value || 1;
+        setTimeout(async () => {
+          const diceResult = await this.gameManager.playDice(ctx, diceValue);
+          if (diceResult.success) {
+            await ctx.reply(
+              formatUserMessage(ctx, diceResult.message),
+              Markup.inlineKeyboard([
+                [Markup.button.callback('🎲 Play Dice Again', `play_again_Dice_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
+                [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
+              ])
+            );
+          } else {
+            await ctx.reply(formatUserMessage(ctx, diceResult.message));
+          }
+          this.gameManager.clearSession(ctx);
+        }, 4000);
+        break;
+      }
+      case 'Coinflip': {
+        ctx.session.awaitingGuess = true;
+        await ctx.reply(
+          formatUserMessage(ctx, '🪙 **Coinflip Game Ready!**\n\nChoose your side:'),
+          {
+            parse_mode: "Markdown",
+            ...Markup.inlineKeyboard([[Markup.button.callback('🪙 Heads', `coinflip_heads_u${uid}`), Markup.button.callback('🪙 Tails', `coinflip_tails_u${uid}`)]])
+          }
+        );
+        break;
+      }
+      case 'Bowling': {
+        const bowlingMessage = await ctx.replyWithDice({ emoji: '🎳' });
+        const bowlingValue = bowlingMessage.dice?.value || 1;
+        setTimeout(async () => {
+          const bowlingResult = await this.gameManager.playBowling(ctx, bowlingValue);
+          if (bowlingResult.success) {
+            await ctx.reply(
+              formatUserMessage(ctx, bowlingResult.message),
+              Markup.inlineKeyboard([
+                [Markup.button.callback('🎳 Play Bowling Again', `play_again_Bowling_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
+                [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
+              ])
+            );
+          } else {
+            await ctx.reply(formatUserMessage(ctx, bowlingResult.message));
+          }
+          this.gameManager.clearSession(ctx);
+        }, 4000);
+        break;
+      }
+    }
+  }
+}

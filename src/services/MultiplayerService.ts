@@ -132,6 +132,32 @@ export class MultiplayerService {
     }
   }
 
+  /**
+   * Handle PvP tie: refund 0.9x wager to both users and mark challenge as completed
+   */
+  async settlePvpTie(ctx: Context, challengeId: number): Promise<void> {
+    const repo = AppDataSource.getRepository(Challenge);
+    const challenge = await repo.findOne({ where: { id: challengeId }, relations: ["creator", "opponent"] });
+    if (!challenge || challenge.status !== "accepted" || !challenge.opponent) return;
+
+    const refundAmount = challenge.wager * 0.9;
+    const creator = challenge.creator;
+    const opponent = challenge.opponent;
+
+    try {
+      // Deduct wager if not already done, then refund 0.9x wager
+      // For tie, we assume no deduction yet, so just refund 0.9x
+      await this.userService.updateBalance(creator, refundAmount, TransactionType.REFUND, `${challenge.game} PvP tie refund`);
+      await this.userService.updateBalance(opponent, refundAmount, TransactionType.REFUND, `${challenge.game} PvP tie refund`);
+      challenge.status = "completed";
+      await repo.save(challenge);
+    } catch (error) {
+      console.error(`Error settling PvP tie for challenge ${challengeId}:`, error);
+      challenge.status = "error";
+      await repo.save(challenge);
+    }
+  }
+
   async completeDraw(challengeId: number): Promise<void> {
     const repo = AppDataSource.getRepository(Challenge);
     const challenge = await repo.findOne({ where: { id: challengeId } });
