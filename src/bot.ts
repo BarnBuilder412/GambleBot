@@ -129,54 +129,54 @@ bot.start(async (ctx) => {
 bot.action(/play_u(\d+)/, async (ctx) => {
   const uid = ctx.match?.[1];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   await menuHandler.handlePlay(ctx);
+  await deleteMessageInGroup(ctx);
 });
 
 bot.action(/game_(.+)_u(\d+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
   const uid = ctx.match?.[2];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   if (gameName) {
     await menuHandler.handleGameSelection(ctx, gameName);
   }
+  await deleteMessageInGroup(ctx);
 });
 
 bot.action(/deposit_u(\d+)/, async (ctx) => {
   const uid = ctx.match?.[1];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   await walletHandler.handleDeposit(ctx);
+  await deleteMessageInGroup(ctx);
 });
 
 bot.action(/withdraw_u(\d+)/, async (ctx) => {
   const uid = ctx.match?.[1];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   await walletHandler.handleWithdraw(ctx);
+  await deleteMessageInGroup(ctx);
 });
 
 bot.action(/settings_u(\d+)/, async (ctx) => {
   const uid = ctx.match?.[1];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   await menuHandler.handleSettings(ctx);
+  await deleteMessageInGroup(ctx);
 });
 
 bot.action("dice_rules", async (ctx) => {
-  await deleteMessageInGroup(ctx);
   await menuHandler.handleDiceRules(ctx);
+  await deleteMessageInGroup(ctx);
 });
 
 bot.action("bowling_rules", async (ctx) => {
-  await deleteMessageInGroup(ctx);
   await menuHandler.handleBowlingRules(ctx);
+  await deleteMessageInGroup(ctx);
 });
 
 bot.action("coinflip_rules", async (ctx) => {
-  await deleteMessageInGroup(ctx);
   await menuHandler.handleCoinflipRules(ctx);
+  await deleteMessageInGroup(ctx);
 });
 
 // Handle "Play Again" buttons
@@ -203,10 +203,10 @@ bot.action(/wager_(.+)_(.+)_u(\d+)/, async (ctx) => {
   const wagerAmount = ctx.match?.[2];
   const uid = ctx.match?.[3];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   if (gameName && wagerAmount) {
     await menuHandler.handleWagerSelection(ctx, gameName, wagerAmount);
   }
+  await deleteMessageInGroup(ctx);
 });
 
 // PvE or PvP choices after wager
@@ -214,35 +214,34 @@ bot.action(/pve_(.+)_u(\d+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
   const uid = ctx.match?.[2];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   if (gameName) {
     await menuHandler.handlePlayVsBot(ctx, gameName);
   }
+  await deleteMessageInGroup(ctx);
 });
 
 bot.action(/pvp_create_(.+)_u(\d+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
   const uid = ctx.match?.[2];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   if (gameName) {
     await menuHandler.handleCreateChallenge(ctx, gameName);
   }
+  await deleteMessageInGroup(ctx);
 });
 
 // pvp_list is intentionally open so others can discover challenges
 bot.action(/pvp_list_(.+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
-  await deleteMessageInGroup(ctx);
   if (gameName) {
     await menuHandler.handleListChallenges(ctx, gameName);
   }
+  await deleteMessageInGroup(ctx);
 });
 
 bot.action(/pvp_accept_(\d+)/, async (ctx) => {
   const challengeId = parseInt(ctx.match?.[1] || '0', 10);
   if (!Number.isNaN(challengeId)) {
-    await deleteMessageInGroup(ctx);
     // Lazy import to avoid cycles
     const { MultiplayerService } = await import('./services/MultiplayerService');
     const { UserService } = await import('./services/UserService');
@@ -268,6 +267,7 @@ bot.action(/pvp_accept_(\d+)/, async (ctx) => {
         await pvpGameService.handlePvPCoinflip(ctx, ch);
       }
     }
+    await deleteMessageInGroup(ctx);
   }
 });
 
@@ -293,8 +293,8 @@ bot.action(/show_history_u(\d+)/, async (ctx) => {
   const uid = ctx.match?.[1];
   if (!(await ensureOwner(ctx, uid))) return;
   await ctx.answerCbQuery();
-  await deleteMessageInGroup(ctx);
   await commandHandler.handleHistoryCommand(ctx, 1, true); // isEdit = true for button action
+  await deleteMessageInGroup(ctx);
 });
 
 // Handle history pagination
@@ -311,8 +311,8 @@ bot.action(/show_transactions_u(\d+)/, async (ctx) => {
   const uid = ctx.match?.[1];
   if (!(await ensureOwner(ctx, uid))) return;
   await ctx.answerCbQuery();
-  await deleteMessageInGroup(ctx);
   await commandHandler.handleOnchainCommand(ctx, 1, true); // isEdit = true for button action
+  await deleteMessageInGroup(ctx);
 });
 
 // Handle onchain pagination
@@ -357,15 +357,15 @@ bot.action(/dice_guess_(\d)/, async (ctx) => {
 bot.action(/coinflip_heads_u(\d+)/, async (ctx) => {
   const uid = ctx.match?.[1];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   await gameHandler.handleCoinflipGuess(ctx, 'heads');
+  await deleteMessageInGroup(ctx);
 });
 
 bot.action(/coinflip_tails_u(\d+)/, async (ctx) => {
   const uid = ctx.match?.[1];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   await gameHandler.handleCoinflipGuess(ctx, 'tails');
+  await deleteMessageInGroup(ctx);
 });
 
 // Handle single player dice number selection
@@ -375,8 +375,8 @@ bot.action(/single_dice_(\d)_u(\d+)/, async (ctx) => {
   if (!(await ensureOwner(ctx, uid))) return;
   
   await ctx.answerCbQuery();
-  await deleteMessageInGroup(ctx);
   const result = await gameManager.playSinglePlayerDice(ctx, selectedNumber);
+  await deleteMessageInGroup(ctx);
   
   // Wait for dice animation to complete (4 seconds)
   setTimeout(async () => {
@@ -402,8 +402,8 @@ bot.action(/single_bowling_(\d)_u(\d+)/, async (ctx) => {
   if (!(await ensureOwner(ctx, uid))) return;
   
   await ctx.answerCbQuery();
-  await deleteMessageInGroup(ctx);
   const result = await gameManager.playSinglePlayerBowling(ctx, selectedNumber);
+  await deleteMessageInGroup(ctx);
   
   // Wait for bowling animation to complete (4 seconds)
   setTimeout(async () => {
@@ -427,10 +427,10 @@ bot.action(/single_(.+)_u(\d+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
   const uid = ctx.match?.[2];
   if (!(await ensureOwner(ctx, uid))) return;
-  await deleteMessageInGroup(ctx);
   if (gameName) {
     await menuHandler.handleSinglePlayer(ctx, gameName);
   }
+  await deleteMessageInGroup(ctx);
 });
 
 // Utility: Retry async function with exponential backoff
