@@ -14,6 +14,7 @@ import { MultiplayerService } from "./services/MultiplayerService";
 import { PvPGameService } from "./services/PvPGameService";
 import { formatUserMessage } from "./utils/userDisplay";
 import { CommandHandler } from "./handlers/CommandHandler";
+import { Markup } from "telegraf";
 
 dotenv.config();
 
@@ -349,7 +350,59 @@ bot.action(/coinflip_tails_u(\d+)/, async (ctx) => {
   await gameHandler.handleCoinflipGuess(ctx, 'tails');
 });
 
-// Handle single player game selection
+// Handle single player dice number selection
+bot.action(/single_dice_(\d)_u(\d+)/, async (ctx) => {
+  const selectedNumber = parseInt(ctx.match?.[1] || '1', 10);
+  const uid = ctx.match?.[2];
+  if (!(await ensureOwner(ctx, uid))) return;
+  
+  await ctx.answerCbQuery();
+  const result = await gameManager.playSinglePlayerDice(ctx, selectedNumber);
+  
+  // Wait for dice animation to complete (4 seconds)
+  setTimeout(async () => {
+    if (result.success) {
+      await ctx.reply(
+        formatUserMessage(ctx, result.message),
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🎲 Play Dice Again', `play_again_Dice_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
+          [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
+        ])
+      );
+    } else {
+      await ctx.reply(formatUserMessage(ctx, result.message));
+    }
+    gameManager.clearSession(ctx);
+  }, 4000);
+});
+
+// Handle single player bowling number selection
+bot.action(/single_bowling_(\d)_u(\d+)/, async (ctx) => {
+  const selectedNumber = parseInt(ctx.match?.[1] || '1', 10);
+  const uid = ctx.match?.[2];
+  if (!(await ensureOwner(ctx, uid))) return;
+  
+  await ctx.answerCbQuery();
+  const result = await gameManager.playSinglePlayerBowling(ctx, selectedNumber);
+  
+  // Wait for bowling animation to complete (4 seconds)
+  setTimeout(async () => {
+    if (result.success) {
+      await ctx.reply(
+        formatUserMessage(ctx, result.message),
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🎳 Play Bowling Again', `play_again_Bowling_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
+          [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
+        ])
+      );
+    } else {
+      await ctx.reply(formatUserMessage(ctx, result.message));
+    }
+    gameManager.clearSession(ctx);
+  }, 4000);
+});
+
+// Handle single player game selection (this should come AFTER the specific handlers)
 bot.action(/single_(.+)_u(\d+)/, async (ctx) => {
   const gameName = ctx.match?.[1];
   const uid = ctx.match?.[2];

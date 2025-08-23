@@ -411,23 +411,26 @@ Good luck! 🍀`;
     }
     switch (gameName) {
       case 'Dice': {
-        const diceMessage = await ctx.replyWithDice({ emoji: '🎲' });
-        const diceValue = diceMessage.dice?.value || 1;
-        setTimeout(async () => {
-          const diceResult = await this.gameManager.playDice(ctx, diceValue);
-          if (diceResult.success) {
-            await ctx.reply(
-              formatUserMessage(ctx, diceResult.message),
-              Markup.inlineKeyboard([
-                [Markup.button.callback('🎲 Play Dice Again', `play_again_Dice_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
-                [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
-              ])
-            );
-          } else {
-            await ctx.reply(formatUserMessage(ctx, diceResult.message));
+        // Show number selection for single player dice
+        await ctx.reply(
+          formatUserMessage(ctx, `🎲 **Single Player Dice Game**\n\n💰 Wager: ${wager}\n🎯 Select a number (1-6):\n\nIf your number comes up, you win 5x your wager!`),
+          {
+            parse_mode: "Markdown",
+            ...Markup.inlineKeyboard([
+              [
+                Markup.button.callback('1️⃣', `single_dice_1_u${uid}`),
+                Markup.button.callback('2️⃣', `single_dice_2_u${uid}`),
+                Markup.button.callback('3️⃣', `single_dice_3_u${uid}`)
+              ],
+              [
+                Markup.button.callback('4️⃣', `single_dice_4_u${uid}`),
+                Markup.button.callback('5️⃣', `single_dice_5_u${uid}`),
+                Markup.button.callback('6️⃣', `single_dice_6_u${uid}`)
+              ],
+              [Markup.button.callback('🔙 Back', `play_u${uid}`)]
+            ])
           }
-          this.gameManager.clearSession(ctx);
-        }, 4000);
+        );
         break;
       }
       case 'Coinflip': {
@@ -442,23 +445,26 @@ Good luck! 🍀`;
         break;
       }
       case 'Bowling': {
-        const bowlingMessage = await ctx.replyWithDice({ emoji: '🎳' });
-        const bowlingValue = bowlingMessage.dice?.value || 1;
-        setTimeout(async () => {
-          const bowlingResult = await this.gameManager.playBowling(ctx, bowlingValue);
-          if (bowlingResult.success) {
-            await ctx.reply(
-              formatUserMessage(ctx, bowlingResult.message),
-              Markup.inlineKeyboard([
-                [Markup.button.callback('🎳 Play Bowling Again', `play_again_Bowling_u${uid}`), Markup.button.callback('🎮 Other Games', `play_u${uid}`)],
-                [Markup.button.callback('🏠 Main Menu', `main_menu_u${uid}`)]
-              ])
-            );
-          } else {
-            await ctx.reply(formatUserMessage(ctx, bowlingResult.message));
+        // Show number selection for single player bowling
+        await ctx.reply(
+          formatUserMessage(ctx, `🎳 **Single Player Bowling Game**\n\n💰 Wager: ${wager}\n🎯 Select a number (1-6):\n\nIf your number comes up, you win 5x your wager!`),
+          {
+            parse_mode: "Markdown",
+            ...Markup.inlineKeyboard([
+              [
+                Markup.button.callback('1️⃣', `single_bowling_1_u${uid}`),
+                Markup.button.callback('2️⃣', `single_bowling_2_u${uid}`),
+                Markup.button.callback('3️⃣', `single_bowling_3_u${uid}`)
+              ],
+              [
+                Markup.button.callback('4️⃣', `single_bowling_4_u${uid}`),
+                Markup.button.callback('5️⃣', `single_bowling_5_u${uid}`),
+                Markup.button.callback('6️⃣', `single_bowling_6_u${uid}`)
+              ],
+              [Markup.button.callback('🔙 Back', `play_u${uid}`)]
+            ])
           }
-          this.gameManager.clearSession(ctx);
-        }, 4000);
+        );
         break;
       }
     }

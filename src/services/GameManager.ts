@@ -149,6 +149,96 @@ export class GameManager {
     }
   }
 
+  async playSinglePlayerDice(ctx: Context, selectedNumber: number): Promise<{ success: boolean; message: string; winAmount?: number }> {
+    if (ctx.session.game !== 'Dice' || !ctx.session.wager) {
+      return { success: false, message: 'Please start a Dice game first.' };
+    }
+
+    if (selectedNumber < 1 || selectedNumber > 6) {
+      return { success: false, message: 'Please select a number between 1 and 6.' };
+    }
+
+    const user = await this.userService.getOrCreateUser(ctx);
+    
+    // CRITICAL: Safe balance deduction with comprehensive checks
+    const deductResult = await this.userService.deductBalance(user, ctx.session.wager, TransactionType.BET, 'Single Player Dice wager');
+    if (!deductResult.success) {
+      return { success: false, message: `❌ ${deductResult.error}` };
+    }
+
+    try {
+      // Roll the dice with animation first
+      const diceMessage = await ctx.replyWithDice({ emoji: '🎲' });
+      const actualRoll = diceMessage.dice?.value || 1;
+      
+      let winAmount = 0;
+      let message = "";
+
+      if (actualRoll === selectedNumber) {
+        // User wins - 5x payout
+        winAmount = ctx.session.wager * 5;
+        message = `🎉 JACKPOT! You selected ${selectedNumber} and rolled ${actualRoll}!\n💰 Payout: ${winAmount}x your wager = $${winAmount.toFixed(2)}`;
+        
+        // Add winnings
+        await this.userService.updateBalance(user, winAmount, TransactionType.WIN, 'Single Player Dice win');
+      } else {
+        // User loses
+        message = `😔 Sorry! You selected ${selectedNumber} but rolled ${actualRoll}.\n💸 You lose your wager of $${ctx.session.wager.toFixed(2)}`;
+      }
+
+      return { success: true, message, winAmount };
+    } catch (error) {
+      // If game fails after deduction, refund the wager
+      await this.userService.updateBalance(user, ctx.session.wager, TransactionType.REFUND, 'Single Player Dice game error refund');
+      return { success: false, message: 'Game error occurred. Wager refunded.' };
+    }
+  }
+
+  async playSinglePlayerBowling(ctx: Context, selectedNumber: number): Promise<{ success: boolean; message: string; winAmount?: number }> {
+    if (ctx.session.game !== 'Bowling' || !ctx.session.wager) {
+      return { success: false, message: 'Please start a Bowling game first.' };
+    }
+
+    if (selectedNumber < 1 || selectedNumber > 6) {
+      return { success: false, message: 'Please select a number between 1 and 6.' };
+    }
+
+    const user = await this.userService.getOrCreateUser(ctx);
+    
+    // CRITICAL: Safe balance deduction with comprehensive checks
+    const deductResult = await this.userService.deductBalance(user, ctx.session.wager, TransactionType.BET, 'Single Player Bowling wager');
+    if (!deductResult.success) {
+      return { success: false, message: `❌ ${deductResult.error}` };
+    }
+
+    try {
+      // Roll the bowling ball with animation first
+      const bowlingMessage = await ctx.replyWithDice({ emoji: '🎳' });
+      const actualRoll = bowlingMessage.dice?.value || 1;
+      
+      let winAmount = 0;
+      let message = "";
+
+      if (actualRoll === selectedNumber) {
+        // User wins - 5x payout
+        winAmount = ctx.session.wager * 5;
+        message = `🎳 STRIKE! You selected ${selectedNumber} and rolled ${actualRoll}!\n💰 Payout: ${winAmount}x your wager = $${winAmount.toFixed(2)}`;
+        
+        // Add winnings
+        await this.userService.updateBalance(user, winAmount, TransactionType.WIN, 'Single Player Bowling win');
+      } else {
+        // User loses
+        message = `😔 Sorry! You selected ${selectedNumber} but rolled ${actualRoll}.\n💸 You lose your wager of $${ctx.session.wager.toFixed(2)}`;
+      }
+
+      return { success: true, message, winAmount };
+    } catch (error) {
+      // If game fails after deduction, refund the wager
+      await this.userService.updateBalance(user, ctx.session.wager, TransactionType.REFUND, 'Single Player Bowling game error refund');
+      return { success: false, message: 'Game error occurred. Wager refunded.' };
+    }
+  }
+
   async startPvPGameWithBot(ctx: any, challenge: any) {
     // This method should trigger the PvP game logic as if the bot was a real player
     // For now, just call the PvPGameService handler for the selected game

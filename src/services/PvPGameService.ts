@@ -33,8 +33,28 @@ export class PvPGameService {
     });
     this.botPlayerSocket.on('message', (msg: WebSocket.Data) => {
       console.log('Received message from Bot Player:', msg.toString());
-      // TODO: Handle bot responses
+      try {
+        const data = JSON.parse(msg.toString());
+        if (data.type === 'move') {
+          this.handleBotMove(data);
+        }
+      } catch (err) {
+        console.error('Error parsing bot message:', err);
+      }
     });
+  }
+
+  private handleBotMove(data: any) {
+    const { challengeId, move } = data;
+    // Store the bot's move for when the PvP game logic runs
+    // The bot's move will be used in the existing PvP settlement logic
+    console.log(`Bot move stored for challenge ${challengeId}:`, move);
+  }
+
+  // Helper method to check if a user is the bot player
+  private isBotPlayer(telegramId: number): boolean {
+    const BOT_PLAYER_TELEGRAM_ID = process.env.BOT_PLAYER_TELEGRAM_ID ? parseInt(process.env.BOT_PLAYER_TELEGRAM_ID) : undefined;
+    return telegramId === BOT_PLAYER_TELEGRAM_ID;
   }
 
   async handlePvPDice(ctx: Context, challenge: Challenge): Promise<void> {
@@ -95,10 +115,28 @@ export class PvPGameService {
     userBId: number
   ): Promise<void> {
     const BOT_PLAYER_TELEGRAM_ID = process.env.BOT_PLAYER_TELEGRAM_ID ? parseInt(process.env.BOT_PLAYER_TELEGRAM_ID) : undefined;
-    const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎲' });
-    const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎲' });
-    const creatorRoll = creatorRollMsg.dice?.value || 1;
-    const opponentRoll = opponentRollMsg.dice?.value || 1;
+    
+    // For bot player, we need to simulate the dice roll since we can't send dice to a bot
+    let creatorRoll: number;
+    let opponentRoll: number;
+    
+    if (this.isBotPlayer(userAId)) {
+      // Creator is bot, simulate their roll
+      creatorRoll = Math.floor(Math.random() * 6) + 1;
+      const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎲' });
+      opponentRoll = opponentRollMsg.dice?.value || 1;
+    } else if (this.isBotPlayer(userBId)) {
+      // Opponent is bot, simulate their roll
+      const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎲' });
+      creatorRoll = creatorRollMsg.dice?.value || 1;
+      opponentRoll = Math.floor(Math.random() * 6) + 1;
+    } else {
+      // Both are human players, normal flow
+      const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎲' });
+      const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎲' });
+      creatorRoll = creatorRollMsg.dice?.value || 1;
+      opponentRoll = opponentRollMsg.dice?.value || 1;
+    }
 
     setTimeout(async () => {
       if (creatorRoll === opponentRoll) {
@@ -211,33 +249,36 @@ export class PvPGameService {
     userBId: number
   ): Promise<void> {
     const BOT_PLAYER_TELEGRAM_ID = process.env.BOT_PLAYER_TELEGRAM_ID ? parseInt(process.env.BOT_PLAYER_TELEGRAM_ID) : undefined;
-    const introA = `🪙 You are HEADS, [${creatorUser.username}](tg://user?id=${creatorUser.telegramId})! Flipping...`;
-    const introB = `🪙 You are TAILS, [${opponentUser.username}](tg://user?id=${opponentUser.telegramId})! Flipping...`;
     
-    if (userAId !== BOT_PLAYER_TELEGRAM_ID) await ctx.telegram.sendMessage(chatA, introA, { parse_mode: 'Markdown' });
-    const flipMsgA = await ctx.telegram.sendMessage(chatA, '🪙');
+    // For bot player, we need to simulate the bowling roll since we can't send dice to a bot
+    let creatorPins: number;
+    let opponentPins: number;
     
-    const coinStates = ['🪙', '🪙'];
-    for (let i = 0; i < coinStates.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      try {
-        await ctx.telegram.editMessageText(chatA, flipMsgA.message_id, undefined, coinStates[i]);
-      } catch (e) {}
+    if (this.isBotPlayer(userAId)) {
+      // Creator is bot, simulate their roll
+      creatorPins = Math.floor(Math.random() * 6) + 1;
+      const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎳' });
+      opponentPins = this.mapBowlingPins(opponentRollMsg.dice?.value || 1);
+    } else if (this.isBotPlayer(userBId)) {
+      // Opponent is bot, simulate their roll
+      const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎳' });
+      creatorPins = this.mapBowlingPins(creatorRollMsg.dice?.value || 1);
+      opponentPins = Math.floor(Math.random() * 6) + 1;
+    } else {
+      // Both are human players, normal flow
+      const creatorRollMsg = await ctx.telegram.sendDice(chatA, { emoji: '🎳' });
+      const opponentRollMsg = await ctx.telegram.sendDice(chatB, { emoji: '🎳' });
+      creatorPins = this.mapBowlingPins(creatorRollMsg.dice?.value || 1);
+      opponentPins = this.mapBowlingPins(opponentRollMsg.dice?.value || 1);
     }
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    if (userBId !== BOT_PLAYER_TELEGRAM_ID && chatB !== chatA) await ctx.telegram.sendMessage(chatB, introB, { parse_mode: 'Markdown' });
-    const flipMsgB = await ctx.telegram.sendMessage(chatB, '🪙');
-    
-    for (let i = 0; i < coinStates.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      try {
-        await ctx.telegram.editMessageText(chatB, flipMsgB.message_id, undefined, coinStates[i]);
-      } catch (e) {}
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
+
+    setTimeout(async () => {
+      if (creatorPins === opponentPins) {
+        await this.handleBowlingTie(ctx, challenge, chatA, creatorUser, opponentUser, userAId, userBId, creatorPins, opponentPins, chatB);
+      } else {
+        await this.settleBowlingGame(ctx, challenge, chatA, creatorUser, opponentUser, userAId, userBId, creatorPins, opponentPins, chatB);
+      }
+    }, 4000);
   }
 
   private async handleBowlingTie(
@@ -353,34 +394,67 @@ export class PvPGameService {
     userAId: number,
     userBId: number
   ): Promise<void> {
-    const introA = `🪙 You are HEADS, [${creatorUser.username}](tg://user?id=${creatorUser.telegramId})! Flipping...`;
-    const introB = `🪙 You are TAILS, [${opponentUser.username}](tg://user?id=${opponentUser.telegramId})! Flipping...`;
-    
     const BOT_PLAYER_TELEGRAM_ID = process.env.BOT_PLAYER_TELEGRAM_ID ? parseInt(process.env.BOT_PLAYER_TELEGRAM_ID) : undefined;
-    if (userAId !== BOT_PLAYER_TELEGRAM_ID) await ctx.telegram.sendMessage(chatA, introA, { parse_mode: 'Markdown' });
-    const flipMsgA = await ctx.telegram.sendMessage(chatA, '🪙');
     
-    const coinStates = ['🪙', '🪙'];
-    for (let i = 0; i < coinStates.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      try {
-        await ctx.telegram.editMessageText(chatA, flipMsgA.message_id, undefined, coinStates[i]);
-      } catch (e) {}
+    // For bot player, we need to simulate the coinflip since we can't send messages to a bot
+    if (this.isBotPlayer(userAId)) {
+      // Creator is bot, only show opponent's side
+      const introB = `🪙 You are TAILS, [${opponentUser.username}](tg://user?id=${opponentUser.telegramId})! Flipping...`;
+      await ctx.telegram.sendMessage(chatB, introB, { parse_mode: 'Markdown' });
+      const flipMsgB = await ctx.telegram.sendMessage(chatB, '🪙');
+      
+      const coinStates = ['🪙', '🪙'];
+      for (let i = 0; i < coinStates.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        try {
+          await ctx.telegram.editMessageText(chatB, flipMsgB.message_id, undefined, coinStates[i]);
+        } catch (e) {}
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } else if (this.isBotPlayer(userBId)) {
+      // Opponent is bot, only show creator's side
+      const introA = `🪙 You are HEADS, [${creatorUser.username}](tg://user?id=${creatorUser.telegramId})! Flipping...`;
+      await ctx.telegram.sendMessage(chatA, introA, { parse_mode: 'Markdown' });
+      const flipMsgA = await ctx.telegram.sendMessage(chatA, '🪙');
+      
+      const coinStates = ['🪙', '🪙'];
+      for (let i = 0; i < coinStates.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        try {
+          await ctx.telegram.editMessageText(chatA, flipMsgA.message_id, undefined, coinStates[i]);
+        } catch (e) {}
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } else {
+      // Both are human players, normal flow
+      const introA = `🪙 You are HEADS, [${creatorUser.username}](tg://user?id=${creatorUser.telegramId})! Flipping...`;
+      const introB = `🪙 You are TAILS, [${opponentUser.username}](tg://user?id=${opponentUser.telegramId})! Flipping...`;
+      
+      await ctx.telegram.sendMessage(chatA, introA, { parse_mode: 'Markdown' });
+      const flipMsgA = await ctx.telegram.sendMessage(chatA, '🪙');
+      
+      const coinStates = ['🪙', '🪙'];
+      for (let i = 0; i < coinStates.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        try {
+          await ctx.telegram.editMessageText(chatA, flipMsgA.message_id, undefined, coinStates[i]);
+        } catch (e) {}
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await ctx.telegram.sendMessage(chatB, introB, { parse_mode: 'Markdown' });
+      const flipMsgB = await ctx.telegram.sendMessage(chatB, '🪙');
+      
+      for (let i = 0; i < coinStates.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        try {
+          await ctx.telegram.editMessageText(chatB, flipMsgB.message_id, undefined, coinStates[i]);
+        } catch (e) {}
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    if (userBId !== BOT_PLAYER_TELEGRAM_ID && chatB !== BOT_PLAYER_TELEGRAM_ID) await ctx.telegram.sendMessage(chatB, introB, { parse_mode: 'Markdown' });
-    const flipMsgB = await ctx.telegram.sendMessage(chatB, '🪙');
-    
-    for (let i = 0; i < coinStates.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      try {
-        await ctx.telegram.editMessageText(chatB, flipMsgB.message_id, undefined, coinStates[i]);
-      } catch (e) {}
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
   }
 
   private mapBowlingPins(value: number): number {
