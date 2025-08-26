@@ -36,6 +36,7 @@ interface SessionData {
   game?: string;
   wager?: number;
   awaitingGuess?: boolean;
+  awaitingWager?: boolean;
   withdrawStep?: 'address' | 'amount';
   withdrawAddress?: string;
 }
@@ -338,6 +339,12 @@ bot.on('text', async (ctx) => {
     // Handle withdrawal amount input
     if (ctx.session.withdrawStep === 'amount') {
       const handled = await walletHandler.handleWithdrawAmountInput(ctx, text);
+      if (handled) return;
+    }
+
+    // Handle wager input for game commands
+    if (ctx.session.awaitingWager) {
+      const handled = await commandHandler.handleWagerResponse(ctx, text);
       if (handled) return;
     }
 

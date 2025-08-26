@@ -23,22 +23,51 @@ export class CommandHandler {
 
     const args = (ctx.message as any)?.text?.split(' ') || [];
     if (args.length < 2) {
+      (ctx as any).session.game = gameName;
+      (ctx as any).session.awaitingWager = true;
       await ctx.reply(
-        formatUserMessage(ctx, `❌ Please specify an amount!\n\nUsage: /${gameName.toLowerCase()} $10\nExample: /${gameName.toLowerCase()} 5.50`)
+        formatUserMessage(ctx, `🎮 **${gameName}**\n\nPlease enter your wager amount:\n\nExample: 1 or $1`)
       );
       return;
     }
 
     const amountText = args[1].replace('$', '');
     const amount = parseFloat(amountText);
-    
+
     if (isNaN(amount) || amount <= 0) {
       await ctx.reply(
-        formatUserMessage(ctx, `❌ Invalid amount!\n\nPlease enter a valid number.\nExample: /${gameName.toLowerCase()} 10`)
+        formatUserMessage(ctx, `❌ Invalid amount!\n\nPlease enter a valid number.\nExample: /${gameName.toLowerCase()} 1`)
       );
       return;
     }
 
+    await this.processGameWithAmount(ctx, gameName, amount);
+  }
+
+  async handleWagerResponse(ctx: Context, text: string): Promise<boolean> {
+    if (!ctx.session.awaitingWager || !ctx.session.game) {
+      return false;
+    }
+
+    const amountText = text.replace('$', '');
+    const amount = parseFloat(amountText);
+
+    if (isNaN(amount) || amount <= 0) {
+      await ctx.reply(
+        formatUserMessage(ctx, `❌ Invalid amount!\n\nPlease enter a valid number.\nExample: 1 or $1`)
+      );
+      return true;
+    }
+
+    // Clear the awaiting state
+    (ctx as any).session.awaitingWager = false;
+
+    // Process the game with the provided amount
+    await this.processGameWithAmount(ctx, ctx.session.game, amount);
+    return true;
+  }
+
+  private async processGameWithAmount(ctx: Context, gameName: string, amount: number): Promise<void> {
     // Check if user has enough balance
     const user = await this.userService.getOrCreateUser(ctx);
     if (!await this.userService.hasEnoughBalance(user, amount)) {
@@ -52,9 +81,9 @@ export class CommandHandler {
     // Set game and wager in session
     (ctx as any).session.game = gameName;
     (ctx as any).session.wager = amount;
-    
+
     const uid = ctx.from?.id;
-    
+
     // Show PvE/PvP selection
     await ctx.reply(
       formatUserMessage(ctx, `🎮 ${gameName} - ${formatUsd(amount)}\n\nChoose your game mode:`),
@@ -81,7 +110,7 @@ export class CommandHandler {
 
     const user = await this.userService.getOrCreateUser(ctx);
     const freshUser = await this.userService.refreshUserBalance(user.id) || user;
-    
+
     await ctx.reply(
       formatUserMessage(ctx, `💰 Your Balance: ${formatUsd(freshUser.balance)}`)
     );
@@ -95,13 +124,13 @@ export class CommandHandler {
     // Check if user is in a group and redirect to private chat
     const chatType = ctx.chat?.type;
     const userId = ctx.from?.id;
-    
+
     if ((chatType === 'group' || chatType === 'supergroup') && userId && !isEdit) {
       try {
         await ctx.telegram.sendMessage(
           userId,
           '📊 **Game History**\n\nI\'ve sent your game history to this private chat for privacy.',
-          { 
+          {
             parse_mode: 'Markdown',
             reply_markup: Markup.inlineKeyboard([
               [Markup.button.callback("📊 View History", `show_history_u${userId}`)]
@@ -120,17 +149,17 @@ export class CommandHandler {
     const user = await this.userService.getOrCreateUser(ctx);
     const limit = 10;
     const offset = (page - 1) * limit;
-    
+
     // Get only game-related transactions (BET, WIN, WAGER, REFUND) - ALL of them, no limit
     const gameTransactionTypes = [TransactionType.BET, TransactionType.WIN, TransactionType.WAGER, TransactionType.REFUND];
     const transactions = await this.userService.getUserGameTransactionHistory(user.telegramId, limit, offset, gameTransactionTypes);
     const totalCount = await this.userService.getUserGameTransactionCount(user.telegramId, gameTransactionTypes);
-    
+
     if (transactions.length === 0) {
-      const message = page === 1 
+      const message = page === 1
         ? "📊 No game history found.\n\nStart playing to see your game history!"
         : "📊 No more game history found.";
-      
+
       if (isEdit) {
         await ctx.editMessageText(formatUserMessage(ctx, message), { parse_mode: 'Markdown' });
       } else {
@@ -144,43 +173,43 @@ export class CommandHandler {
     historyText += "```\n";
     historyText += "Game       | Status | Amount\n";
     historyText += "-----------|--------|--------\n";
-    
+
     transactions.forEach((tx: any) => {
       const gameName = this.extractGameFromDescription(tx.description || '');
       const status = this.getGameStatus(tx.type);
       const amount = tx.amount > 0 ? `+${formatUsd(tx.amount)}` : formatUsd(tx.amount);
-      
+
       // Format with proper spacing for alignment
       const gameCol = gameName.padEnd(10);
       const statusCol = status.padEnd(6);
       const amountCol = amount.padStart(8);
-      
+
       historyText += `${gameCol} | ${statusCol} | ${amountCol}\n`;
     });
-    
+
     historyText += "```";
 
     const uid = ctx.from?.id;
-    
+
     // Create pagination buttons
     const buttons = [];
     const navButtons = [];
-    
+
     if (page > 1) {
       navButtons.push(Markup.button.callback("⬅️ Previous", `history_page_${page - 1}_u${uid}`));
     }
-    
+
     if (page < totalPages) {
       navButtons.push(Markup.button.callback("Next ➡️", `history_page_${page + 1}_u${uid}`));
     }
-    
+
     if (navButtons.length > 0) {
       buttons.push(navButtons);
     }
-    
+
     buttons.push([Markup.button.callback("🔙 Main Menu", `main_menu_u${uid}`)]);
 
-    const messageOptions = { 
+    const messageOptions = {
       parse_mode: 'Markdown' as const,
       reply_markup: Markup.inlineKeyboard(buttons).reply_markup
     };
@@ -209,13 +238,13 @@ export class CommandHandler {
     // Check if user is in a group and redirect to private chat
     const chatType = ctx.chat?.type;
     const userId = ctx.from?.id;
-    
+
     if ((chatType === 'group' || chatType === 'supergroup') && userId) {
       try {
         await ctx.telegram.sendMessage(
           userId,
           '💰 **Deposit Funds**\n\nI\'ve sent the deposit information to this private chat for security.',
-          { 
+          {
             parse_mode: 'Markdown',
             reply_markup: Markup.inlineKeyboard([
               [Markup.button.callback("💰 Get Deposit Address", `deposit_u${userId}`)]
@@ -249,13 +278,13 @@ export class CommandHandler {
     // Check if user is in a group and redirect to private chat
     const chatType = ctx.chat?.type;
     const userId = ctx.from?.id;
-    
+
     if ((chatType === 'group' || chatType === 'supergroup') && userId) {
       try {
         await ctx.telegram.sendMessage(
           userId,
           '🏧 **Withdraw Funds**\n\nI\'ve sent the withdrawal interface to this private chat for security.',
-          { 
+          {
             parse_mode: 'Markdown',
             reply_markup: Markup.inlineKeyboard([
               [Markup.button.callback("🏧 Start Withdrawal", `withdraw_u${userId}`)]
@@ -299,13 +328,13 @@ export class CommandHandler {
     // Check if user is in a group and redirect to private chat
     const chatType = ctx.chat?.type;
     const userId = ctx.from?.id;
-    
+
     if ((chatType === 'group' || chatType === 'supergroup') && userId && !isEdit) {
       try {
         await ctx.telegram.sendMessage(
           userId,
           '💰 **Onchain Transactions**\n\nI\'ve sent your transaction history to this private chat for privacy.',
-          { 
+          {
             parse_mode: 'Markdown',
             reply_markup: Markup.inlineKeyboard([
               [Markup.button.callback("💰 View Transactions", `show_transactions_u${userId}`)]
@@ -324,17 +353,17 @@ export class CommandHandler {
     const user = await this.userService.getOrCreateUser(ctx);
     const limit = 10;
     const offset = (page - 1) * limit;
-    
+
     // Get only onchain transactions (DEPOSIT, WITHDRAW)
     const transactionTypes = [TransactionType.DEPOSIT, TransactionType.WITHDRAW];
     const transactions = await this.userService.getUserGameTransactionHistory(user.telegramId, limit, offset, transactionTypes);
     const totalCount = await this.userService.getUserGameTransactionCount(user.telegramId, transactionTypes);
-    
+
     if (transactions.length === 0) {
-      const message = page === 1 
+      const message = page === 1
         ? "💰 No transactions found.\n\nDeposit or withdraw to see your transaction history!"
         : "💰 No more transactions found.";
-      
+
       if (isEdit) {
         await ctx.editMessageText(formatUserMessage(ctx, message), { parse_mode: 'Markdown' });
       } else {
@@ -348,41 +377,41 @@ export class CommandHandler {
     historyText += "```\n";
     historyText += "Action     | Amount\n";
     historyText += "-----------|--------\n";
-    
+
     transactions.forEach((tx: any) => {
       const action = tx.type === TransactionType.DEPOSIT ? 'Deposit' : 'Withdraw';
       const amount = tx.amount > 0 ? `+${formatUsd(tx.amount)}` : formatUsd(tx.amount);
-      
+
       // Format with proper spacing for alignment
       const actionCol = action.padEnd(10);
       const amountCol = amount.padStart(8);
-      
+
       historyText += `${actionCol} | ${amountCol}\n`;
     });
-    
+
     historyText += "```";
 
     const uid = ctx.from?.id;
-    
+
     // Create pagination buttons
     const buttons = [];
     const navButtons = [];
-    
+
     if (page > 1) {
       navButtons.push(Markup.button.callback("⬅️ Previous", `onchain_page_${page - 1}_u${uid}`));
     }
-    
+
     if (page < totalPages) {
       navButtons.push(Markup.button.callback("Next ➡️", `onchain_page_${page + 1}_u${uid}`));
     }
-    
+
     if (navButtons.length > 0) {
       buttons.push(navButtons);
     }
-    
+
     buttons.push([Markup.button.callback("🔙 Main Menu", `main_menu_u${uid}`)]);
 
-    const messageOptions = { 
+    const messageOptions = {
       parse_mode: 'Markdown' as const,
       reply_markup: Markup.inlineKeyboard(buttons).reply_markup
     };
