@@ -1,6 +1,3 @@
-// Entry point for the GambleBot Bot Player
-// This bot will act as a PvP opponent and communicate with the main game server
-
 import * as dotenv from 'dotenv';
 dotenv.config();
 import { WebSocketServer, WebSocket } from 'ws';
@@ -11,10 +8,9 @@ const bot = new Telegraf(BOT_PLAYER_TOKEN);
 
 bot.start((ctx) => ctx.reply('🤖 Bot player is ready to play PvP games!'));
 
-// Store active challenges and chats
 const activeChallenges: Record<number, { chatId: number, game: string }> = {};
 
-const PORT = process.env.BOT_PLAYER_PORT ? parseInt(process.env.BOT_PLAYER_PORT) : 8081;
+const PORT = process.env.BOT_PLAYER_PORT ? parseInt(process.env.BOT_PLAYER_PORT) : 9999;
 const wss = new WebSocketServer({ port: PORT });
 
 console.log(`Bot Player WebSocket server started on ws://localhost:${PORT}`);
@@ -29,7 +25,6 @@ wss.on('connection', (ws: WebSocket) => {
       if (data.type === 'invite') {
         handleInvite(ws, data);
       }
-      // Future: handle other message types (e.g., result)
     } catch (err) {
       console.error('Error parsing message:', err);
     }
@@ -42,15 +37,10 @@ wss.on('connection', (ws: WebSocket) => {
 
 function handleInvite(ws: WebSocket, data: any) {
   const { game, challengeId, opponent } = data;
-  // Store the challenge and chat info
   activeChallenges[challengeId] = {
-    chatId: opponent.id, // This should be the user's Telegram ID
+    chatId: opponent.id,
     game
   };
-  // Notify the user that the bot has joined
-  bot.telegram.sendMessage(opponent.id, `🤖 Bot has joined your ${game} game!`);
-
-  // Simulate bot move after a short delay
   setTimeout(() => {
     let move: any = {};
     switch (game) {
@@ -67,16 +57,14 @@ function handleInvite(ws: WebSocket, data: any) {
         bot.telegram.sendMessage(opponent.id, 'Unknown game type for bot.');
         return;
     }
-    // Send move back to the main server
     const response = {
       type: 'move',
       challengeId,
       move
     };
     ws.send(JSON.stringify(response));
-    bot.telegram.sendMessage(opponent.id, `🤖 Bot made its move in ${game}!`);
     console.log('Sent move to main server:', response);
-  }, 2000); // 2 second delay for realism
+  }, 2000);
 }
 
 bot.launch();
